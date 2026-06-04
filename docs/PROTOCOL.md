@@ -1,38 +1,6 @@
-# Hermes Agora Protocol Specification
+# Hermes Agora 通信协议规范
 
 Version: 0.1.0-draft
-
-## 概述
-
-本文档定义 Hermes Agora 的通信协议、消息格式、讨论流程。
-
-## 术语
-
-- **Coordinator**: 调度中心服务
-- **Agent**: 参与讨论的 Hermes 实例（通过 Agent Client 接入）
-- **Motion**: 议题，待讨论的问题/提案
-- **Round**: 轮次，每轮所有 Agent 发言一次
-- **Vote**: 投票，Agent 对议题的立场
-
-## 通信层
-
-### 传输协议
-
-- **注册/控制**: HTTP REST API
-- **实时消息**: WebSocket
-
-### 端点
-
-```
-HTTP:
-  POST /agents/register      Agent 注册
-  POST /motions              创建议题
-  GET  /motions/{id}         获取议题详情
-  GET  /motions/{id}/history 获取讨论历史
-
-WebSocket:
-  /ws/{agent_id}             Agent 实时消息通道
-```
 
 ## 消息格式
 
@@ -48,9 +16,9 @@ WebSocket:
 }
 ```
 
-### 消息类型
+## 消息类型
 
-#### REGISTER (Agent → Coordinator)
+### REGISTER (Agent → Coordinator)
 
 Agent 注册
 
@@ -67,7 +35,7 @@ Agent 注册
 }
 ```
 
-#### NEW_MOTION (Coordinator → Agent)
+### NEW_MOTION (Coordinator → Agent)
 
 新议题通知
 
@@ -85,7 +53,7 @@ Agent 注册
 }
 ```
 
-#### SPEAK (Agent → Coordinator)
+### SPEAK (Agent → Coordinator)
 
 发言
 
@@ -106,7 +74,7 @@ Agent 注册
 }
 ```
 
-#### BROADCAST (Coordinator → Agent)
+### BROADCAST (Coordinator → Agent)
 
 广播其他 Agent 的发言
 
@@ -124,7 +92,7 @@ Agent 注册
 }
 ```
 
-#### REQUEST_VOTE (Coordinator → Agent)
+### REQUEST_VOTE (Coordinator → Agent)
 
 请求投票
 
@@ -138,7 +106,7 @@ Agent 注册
 }
 ```
 
-#### VOTE (Agent → Coordinator)
+### VOTE (Agent → Coordinator)
 
 投票
 
@@ -155,7 +123,7 @@ Agent 注册
 }
 ```
 
-#### RESULT (Coordinator → Agent)
+### RESULT (Coordinator → Agent)
 
 最终结果
 
@@ -176,7 +144,7 @@ Agent 注册
 }
 ```
 
-## 讨论流程状态机
+## 讨论状态机
 
 ```
 [DRAFT] → [DISCUSSING] → [VOTING] → [CLOSED]
@@ -190,26 +158,43 @@ Agent 注册
 2. **DISCUSSING → VOTING**: 所有轮次完成，请求投票
 3. **VOTING → CLOSED**: 所有 Agent 已投票，输出结果
 
-## Agent 行为规范
+## REST API
 
-### 发言规则
+```
+POST   /agents/register        Agent 注册
+DELETE /agents/{agent_id}      Agent 注销
+GET    /agents                 已注册 Agent 列表
 
-1. 每轮发言一次，等待 Coordinator 广播其他 Agent 后再进入下一轮
-2. 发言必须包含 `stance`（立场）
-3. 可引用证据（搜索结果、过往经验）
-4. 可质疑其他 Agent 的论点
+POST   /motions                创建议题
+GET    /motions                议题列表
+GET    /motions/{id}           议题详情
+POST   /motions/{id}/speak     发言
+POST   /motions/{id}/vote      投票
+GET    /motions/{id}/history   讨论历史
+GET    /motions/{id}/result    讨论结果
+POST   /motions/{id}/close     关闭议题
 
-### 投票规则
+WebSocket:
+  /ws/{agent_id}               Agent 实时消息通道
+```
 
-1. 必须在收到 `REQUEST_VOTE` 后投票
-2. 投票必须附带理由
-3. 可弃权（abstain）
+## 投票方法
 
-### 进化行为
+| 方法 | 规则 |
+|------|------|
+| `simple_majority` | 简单多数（>50%） |
+| `supermajority` | 超过 2/3 |
+| `unanimous` | 全票通过 |
+| `weighted` | 加权投票（根据 Agent 可信度） |
 
-1. 收到 `RESULT` 后，将讨论经验写入本地 Hermes memory
-2. 记录：自己的论点是否被采纳、判断是否正确
-3. Curator 定期优化讨论策略
+## Agent 角色
+
+| 角色 | 说明 |
+|------|------|
+| `moderator` | 主持人（可选，默认由 Coordinator 担任） |
+| `expert` | 专家（特定领域知识） |
+| `devil_advocate` | 魔鬼代言人（故意提出反对意见） |
+| `neutral` | 中立观察者 |
 
 ## 错误处理
 
@@ -228,28 +213,4 @@ Agent 注册
 - `MOTION_NOT_FOUND`: 议题不存在
 - `INVALID_STATE`: 状态不允许该操作
 - `ROUND_NOT_COMPLETE`: 轮次未完成
-
-## 扩展点
-
-### 投票方法
-
-- `simple_majority`: 简单多数
-- `supermajority`: 超过 2/3
-- `unanimous`: 全票通过
-- `weighted`: 加权投票（根据 Agent 可信度）
-
-### Agent 角色
-
-- `moderator`: 主持人（可选，由 Coordinator 担任）
-- `expert`: 专家（特定领域知识）
-- `devil_advocate`: 魔鬼代言人（故意提出反对意见）
-- `neutral`: 中立观察者
-
----
-
-## 下一步
-
-- [ ] 定义 SQLite 存储结构
-- [ ] 实现 Coordinator 服务
-- [ ] 实现 Agent Client 库
-- [ ] 编写集成测试
+- `ALREADY_VOTED`: 已经投过票
