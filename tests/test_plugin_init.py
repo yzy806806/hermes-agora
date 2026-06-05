@@ -29,6 +29,7 @@ class MockCtx:
     def __init__(self):
         self.tools: dict = {}
         self.hooks: dict = {}
+        self.commands: dict = {}
         self.config: dict = {}
 
     def register_tool(self, name: str, func) -> None:
@@ -36,6 +37,16 @@ class MockCtx:
 
     def register_hook(self, name: str, func) -> None:
         self.hooks[name] = func
+
+    def register_command(
+        self, name: str, handler, description: str = "",
+        args_hint: str = "",
+    ) -> None:
+        self.commands[name] = {
+            "handler": handler,
+            "description": description,
+            "args_hint": args_hint,
+        }
 
 
 class TestRegister:
@@ -64,6 +75,13 @@ class TestRegister:
         plugin.register(ctx)
         for name, func in ctx.tools.items():
             assert asyncio.iscoroutinefunction(func), f"{name} is not async"
+
+    def test_registers_agora_command(self):
+        plugin = _load_plugin()
+        ctx = MockCtx()
+        plugin.register(ctx)
+        assert "agora" in ctx.commands
+        assert ctx.commands["agora"]["description"] == "多 Agent 讨论决策"
 
     def test_get_client_before_register_raises(self):
         plugin = _load_plugin()

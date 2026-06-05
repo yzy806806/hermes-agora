@@ -14,3 +14,7 @@ hooks:
   - on_session_start
   - on_session_end
   - post_tool_call
+provides_commands:
+  - name: agora
+    description: "多 Agent 讨论决策"
+    args_hint: "<new|list|status|vote|result> [args]"

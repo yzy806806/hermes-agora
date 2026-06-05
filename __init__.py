@@ -144,4 +144,13 @@ def register(ctx) -> None:
     ctx.register_hook("on_session_end", on_session_end)
     ctx.register_hook("post_tool_call", post_tool_call)
 
+    # Register slash command
+    from commands import handle_agora
+    ctx.register_command(
+        "agora",
+        handle_agora,
+        description="多 Agent 讨论决策",
+        args_hint="<new|list|status|vote|result> [args]",
+    )
+
     logger.info("Hermes Agora plugin registered successfully")
