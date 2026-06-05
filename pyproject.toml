@@ -11,6 +11,7 @@ dependencies = [
     "websockets>=12.0",
     "pydantic>=2.0",
     "aiosqlite>=0.20",
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
@@ -27,3 +28,6 @@ agora-agent = "agent_client.client:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["coordinator", "agent_client"]
