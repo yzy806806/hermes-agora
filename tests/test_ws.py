@@ -8,10 +8,10 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from coordinator.models import MessageType, MotionStatus
-from coordinator.ws import ConnectionManager, manager, on_agent_disconnect
-from coordinator.ws_handlers import (
-    handle_ping, handle_register, handle_speak, handle_vote,
-)
+from coordinator.ws import ConnectionManager, manager
+from coordinator.ws_endpoint import on_agent_disconnect
+from coordinator.ws_handlers import handle_ping, handle_register, handle_speak
+from coordinator.ws_vote import handle_vote
 
 
 @pytest.fixture
@@ -167,7 +167,7 @@ class TestHandlers:
 class TestOnDisconnect:
     @pytest.mark.asyncio
     async def test_marks_offline(self, mock_storage):
-        with patch("coordinator.ws.manager") as m:
+        with patch("coordinator.ws_endpoint.manager") as m:
             m._storage = mock_storage
             m.broadcast = AsyncMock()
             await on_agent_disconnect("a1")
