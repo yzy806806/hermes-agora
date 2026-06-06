@@ -1,16 +1,16 @@
 # Hermes Agora 开发计划
 
-## Phase 1: 最小可用（MVP）
+## Phase 1: 最小可用（MVP） ✅
 
 目标：能跑通一轮完整的讨论流程
 
-- [ ] 项目骨架：plugin.yaml + __init__.py + register(ctx)
-- [ ] Coordinator FastAPI 服务（HTTP + WebSocket）
-- [ ] SQLite 存储层（motions、messages、votes）
-- [ ] 6 个基础工具（create_motion、speak、vote、list、history、result）
-- [ ] /agora 斜杠命令
-- [ ] Agent 注册/注销
-- [ ] 单轮讨论 + 简单多数投票
+- [x] 项目骨架：plugin.yaml + __init__.py + register(ctx)
+- [x] Coordinator FastAPI 服务（HTTP + WebSocket）
+- [x] SQLite 存储层（motions、messages、votes）
+- [x] 6 个基础工具（create_motion、speak、vote、list、history、result）
+- [x] /agora 斜杠命令
+- [x] Agent 注册/注销
+- [x] 单轮讨论 + 简单多数投票
 
 ## Phase 2: 智能讨论
 
