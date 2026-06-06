@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.0 (2026-06-07)
+
+### Added
+- **Phase 4 Bootstrap - Self-Organizing Development Engine**: New system for AI-driven project development
+  - `coordinator/bootstrap/__init__.py`: Bootstrap engine initialization
+  - `coordinator/bootstrap/trigger_types.py`: Trigger type definitions (schedule, event, manual)
+  - `coordinator/bootstrap/trigger_manager.py`: Trigger management and execution
+  - `coordinator/bootstrap/schedule_checker.py`: Schedule-based trigger detection
+  - `coordinator/bootstrap/discussion_driver.py`: Trigger discussions from development needs
+  - `coordinator/bootstrap/task_generator.py`: Generate tasks from discussion conclusions
+  - `coordinator/bootstrap/approval_flow.py`: User approval workflow
+  - `coordinator/bootstrap/routes.py`: Bootstrap API routes
+  - `coordinator/bootstrap/routes_extra.py`: Extended bootstrap routes
+  - `coordinator/bootstrap/bootstrap_schema.py`: Bootstrap data models
+  - `coordinator/storage/bootstrap.py`: Bootstrap storage layer
+  - `coordinator/storage/bootstrap_approval.py`: Approval storage layer
+
+- **New Tests**: Comprehensive test coverage for Phase 4 features
+  - `tests/test_trigger_manager.py`
+  - `tests/test_bootstrap_schema.py`
+  - `tests/test_discussion_driver.py`
+  - `tests/test_task_generator.py`
+  - `tests/test_approval_flow.py`
+  - `tests/test_bootstrap_engine.py`
+
+- **Documentation**
+  - `docs/DESIGN-bootstrap.md`: Bootstrapping system design
+
+### Changed
+- Updated `coordinator/main.py` - integrated BootstrapEngine
+- Updated `coordinator/storage/schema.py` - SCHEMA_VERSION 3→4, new bootstrap tables
+- Updated `coordinator/storage/storage.py` - new bootstrap CRUD methods
+- Updated `docs/ROADMAP.md` - Phase 4 marked complete
+
+---
+
 ## v0.3.0 (2026-06-06)
 
 ### Added

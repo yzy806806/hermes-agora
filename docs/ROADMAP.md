@@ -35,14 +35,18 @@
 - [x] Curator 优化讨论策略
 - [x] 相似议题自动引用历史结论（不重复讨论）
 
-## Phase 4: 自举
+## Phase 4: 自举 ✅
 
 目标：用 Agora 开发 Agora
 
-- [ ] AI 团队通过 Agora 讨论开发方向
-- [ ] 用户拍板 + AI 团队方案论证
-- [ ] 开发计划由讨论结果驱动
-- [ ] 项目自组织、自进化
+- [x] AI 团队通过 Agora 讨论开发方向
+- [x] 用户拍板 + AI 团队方案论证
+- [x] 开发计划由讨论结果驱动
+- [x] 项目自组织、自进化
+- [x] Trigger 系统（schedule/event/manual）
+- [x] Discussion Driver - 从开发需求触发讨论
+- [x] Task Generator - 从讨论结论生成任务
+- [x] Approval Flow - 用户审批工作流
 
 ## 待讨论的设计问题
 
