@@ -14,6 +14,7 @@ import aiosqlite
 
 from . import agents as _agents
 from . import assessments as _assessments
+from . import judgments as _judgments
 from . import messages as _messages
 from . import motions as _motions
 from . import votes as _votes
@@ -192,3 +193,30 @@ class Storage:
     ) -> list[dict]:
         async with self._connection() as db:
             return await _assessments.get_assessments(db, motion_id)
+
+    # --- Judgment CRUD ---
+
+    async def record_judgment(
+        self, motion_id: str, agent_id: str,
+        predicted: str, actual: str, confidence: float,
+    ) -> int:
+        async with self._connection() as db:
+            return await _judgments.record_judgment(
+                db, motion_id, agent_id,
+                predicted, actual, confidence)
+
+    async def get_agent_stats(self, agent_id: str) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _judgments.get_agent_stats(db, agent_id)
+
+    async def get_recent_trend(
+        self, agent_id: str, limit: int = 5,
+    ) -> list[int]:
+        async with self._connection() as db:
+            return await _judgments.get_recent_trend(db, agent_id, limit)
+
+    async def get_judgment_leaderboard(
+        self, limit: int = 10,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _judgments.get_leaderboard(db, limit)

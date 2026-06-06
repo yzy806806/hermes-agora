@@ -1,6 +1,6 @@
 """SQL schema definitions for the Agora Coordinator database."""
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA_SQL = """\
 PRAGMA foreign_keys = ON;
@@ -85,4 +85,20 @@ CREATE TABLE IF NOT EXISTS assessments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_assessments_motion ON assessments(motion_id);
+
+CREATE TABLE IF NOT EXISTS judgment_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    motion_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    predicted TEXT NOT NULL,
+    actual TEXT NOT NULL,
+    confidence REAL NOT NULL DEFAULT 1.0,
+    is_correct INTEGER NOT NULL DEFAULT 0,
+    recorded_at TEXT NOT NULL,
+    FOREIGN KEY (motion_id) REFERENCES motions(id) ON DELETE CASCADE,
+    FOREIGN KEY (agent_id) REFERENCES agents(agent_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_judgment_agent ON judgment_records(agent_id);
+CREATE INDEX IF NOT EXISTS idx_judgment_motion ON judgment_records(motion_id);
 """

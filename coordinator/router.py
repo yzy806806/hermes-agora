@@ -26,6 +26,7 @@ from .models import (
 from .state import InvalidTransitionError, StateMachine
 from .storage import Storage
 from .ws import manager
+from .curator import DiscussionCurator
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +35,15 @@ router = APIRouter()
 # Module-level singletons — set by main.py during app startup
 _storage: Optional[Storage] = None
 _state_machine: Optional[StateMachine] = None
+_curator: Optional[DiscussionCurator] = None
 
 
 def init_deps(storage: Storage, state_machine: StateMachine) -> None:
     """Initialize module dependencies. Called once at app startup."""
-    global _storage, _state_machine
+    global _storage, _state_machine, _curator
     _storage = storage
     _state_machine = state_machine
+    _curator = DiscussionCurator(storage, storage.db_path)
     manager.set_deps(storage, state_machine)
 
 
@@ -115,6 +118,13 @@ async def create_motion(request: MotionCreateRequest) -> Motion:
         voting_method=request.voting_method.value,
         context=request.context or "",
     )
+    # Phase 3: Curator optimization
+    if _curator is not None:
+        try:
+            optimized = await _curator.optimize_motion(data)
+            data.update(optimized)
+        except Exception as exc:
+            logger.warning("Curator optimization failed: %s", exc)
     return Motion(**data)
 
 

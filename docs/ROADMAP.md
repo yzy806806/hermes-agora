@@ -25,15 +25,15 @@
 - [x] 多种投票方式：simple_majority / supermajority / unanimous / weighted
 - [x] 非二元选择（A方案/B方案/C方案、优先级排序）
 
-## Phase 3: 记忆与进化
+## Phase 3: 记忆与进化 ✅
 
 目标：讨论越多越聪明
 
-- [ ] 讨论结论自动写入 Hermes memory
-- [ ] Coordinator 记住历史决策模式
-- [ ] Participant 记住自己的判断正确率
-- [ ] Curator 优化讨论策略
-- [ ] 相似议题自动引用历史结论（不重复讨论）
+- [x] 讨论结论自动写入 Hermes memory
+- [x] Coordinator 记住历史决策模式
+- [x] Participant 记住自己的判断正确率
+- [x] Curator 优化讨论策略
+- [x] 相似议题自动引用历史结论（不重复讨论）
 
 ## Phase 4: 自举
 

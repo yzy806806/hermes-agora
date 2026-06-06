@@ -139,5 +139,12 @@ async def _check_all_voted(
                 "motion_id": motion_id,
                 "payload": summary,
             })
+            # Phase 3: post-discussion review
+            from .curator import DiscussionCurator
+            curator = DiscussionCurator(storage, storage.db_path)
+            try:
+                await curator.post_discussion_review(motion_id)
+            except Exception as exc:
+                logger.warning("Post-discussion review failed: %s", exc)
         except (InvalidTransitionError, ValueError) as exc:
             logger.warning("Vote completion transition failed: %s", exc)

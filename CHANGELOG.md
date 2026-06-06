@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.3.0 (2026-06-06)
+
+### Added
+- **Memory and Evolution System**: New memory synchronization and agent evolution
+  - `coordinator/memory_sync.py`: Memory synchronization across sessions
+  - `coordinator/history_pattern.py`: Historical pattern detection and analysis
+  - `coordinator/judgment_tracker.py`: Track and analyze agent judgments
+  - `coordinator/judgment_types.py`: Type definitions for judgments
+  - `coordinator/conclusion_types.py`: Type definitions for conclusions
+  - `coordinator/similar_topic.py`: Similar topic detection
+  - `coordinator/curator.py`: Agent evolution and self-improvement
+  - `coordinator/storage/judgments.py`: Storage for judgment data
+
+- **New Tests**: Comprehensive test coverage for Phase 3 features
+  - `tests/test_memory_sync.py`
+  - `tests/test_memory_sync_helpers.py`
+  - `tests/test_memory_sync_sync.py`
+  - `tests/test_history_pattern.py`
+  - `tests/test_history_pattern_strategy.py`
+  - `tests/test_judgment_accuracy.py`
+  - `tests/test_judgment_leaderboard.py`
+  - `tests/test_judgment_tracker.py`
+  - `tests/test_similar_topic.py`
+  - `tests/test_curator.py`
+
+- **Documentation**: Design documents for Phase 3
+  - `docs/DESIGN-memory-evolution.md`: Memory and evolution system design
+
+### Changed
+- Updated `coordinator/router.py` - new memory/evolution endpoints
+- Updated `coordinator/storage/schema.py` - new judgment tables
+- Updated `coordinator/storage/storage.py` - new judgment storage
+- Updated `coordinator/ws_vote.py` - voting enhancements
+- Updated `tests/conftest.py` - new test fixtures
+- Updated `uv.lock` - dependency updates
+- Updated `docs/ROADMAP.md` - Phase 3 marked complete
+
+---
+
 ## v0.2.0 (2025-06-06)
 
 ### Added

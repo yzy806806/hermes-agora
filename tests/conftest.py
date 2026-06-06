@@ -6,6 +6,7 @@ import pytest
 import pytest_asyncio
 
 from coordinator.storage import Storage
+from coordinator.judgment_tracker import JudgmentTracker
 
 
 @pytest.fixture(scope="session")
@@ -23,3 +24,9 @@ async def storage(tmp_path):
     s = Storage(db_path)
     await s.init_db()
     yield s
+
+
+@pytest_asyncio.fixture(loop_scope="session")
+async def tracker(storage):
+    """Create a JudgmentTracker instance using the test database."""
+    return JudgmentTracker(storage.db_path)
