@@ -14,6 +14,8 @@ import aiosqlite
 
 from . import agents as _agents
 from . import assessments as _assessments
+from . import bootstrap as _bootstrap
+from . import bootstrap_approval as _bootstrap_approval
 from . import judgments as _judgments
 from . import messages as _messages
 from . import motions as _motions
@@ -220,3 +222,83 @@ class Storage:
     ) -> list[dict]:
         async with self._connection() as db:
             return await _judgments.get_leaderboard(db, limit)
+
+    # --- Bootstrap Trigger CRUD ---
+
+    async def create_bootstrap_trigger(
+        self, trigger_type: str, topic: str,
+        source: str, context: str, priority: int = 0,
+    ) -> int:
+        async with self._connection() as db:
+            return await _bootstrap.create_trigger(
+                db, trigger_type, topic, source, context, priority)
+
+    async def get_pending_bootstrap_triggers(
+        self, limit: int = 10,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _bootstrap.get_pending_triggers(db, limit)
+
+    async def update_bootstrap_trigger_status(
+        self, trigger_id: int, status: str,
+    ) -> None:
+        async with self._connection() as db:
+            await _bootstrap.update_trigger_status(db, trigger_id, status)
+
+    # --- Bootstrap Schedule CRUD ---
+
+    async def create_bootstrap_schedule(
+        self, name: str, cron_expression: str,
+        topic_template: str, next_run: str | None = None,
+    ) -> int:
+        async with self._connection() as db:
+            return await _bootstrap.create_schedule(
+                db, name, cron_expression, topic_template, next_run)
+
+    async def list_bootstrap_schedules(
+        self, enabled_only: bool = False,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _bootstrap.list_schedules(db, enabled_only)
+
+    # --- Bootstrap Approval CRUD ---
+
+    async def create_bootstrap_approval(
+        self, motion_id: str, decision: str,
+        rationale: str = "", action_items: list[dict] | None = None,
+    ) -> int:
+        async with self._connection() as db:
+            return await _bootstrap_approval.create_approval(
+                db, motion_id, decision, rationale, action_items)
+
+    async def decide_bootstrap_approval(
+        self, approval_id: int, approved: bool,
+        approved_by: str = "", feedback: str = "",
+    ) -> None:
+        async with self._connection() as db:
+            await _bootstrap_approval.decide_approval(
+                db, approval_id, approved, approved_by, feedback)
+
+    async def get_pending_bootstrap_approvals(
+        self, limit: int = 10,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _bootstrap_approval.get_pending_approvals(
+                db, limit)
+
+    # --- Bootstrap Agent CRUD ---
+
+    async def register_bootstrap_agent(
+        self, agent_id: str, name: str, role: str,
+        model: str = "", capabilities: list[str] | None = None,
+    ) -> int:
+        async with self._connection() as db:
+            return await _bootstrap_approval.register_bootstrap_agent(
+                db, agent_id, name, role, model, capabilities)
+
+    async def list_bootstrap_agents(
+        self, active_only: bool = False,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _bootstrap_approval.list_bootstrap_agents(
+                db, active_only)

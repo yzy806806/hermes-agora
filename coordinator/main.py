@@ -19,6 +19,9 @@ from .router import init_deps, router
 from .state import StateMachine
 from .storage import Storage
 from .ws_endpoint import websocket_endpoint
+from .bootstrap import BootstrapConfig, BootstrapEngine
+from .bootstrap.routes import router as bootstrap_router
+from .bootstrap.routes_extra import router as bootstrap_extra_router
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +36,10 @@ async def lifespan(app: FastAPI):
     await storage.init_db()
     state_machine = StateMachine(storage)
     init_deps(storage, state_machine)
+    # Bootstrap engine init
+    bootstrap_cfg = BootstrapConfig(db_path=settings.db_path)
+    bootstrap_engine = BootstrapEngine(bootstrap_cfg)
+    bootstrap_engine.init_routes()
     logger.info("Coordinator started (db=%s)", settings.db_path)
     yield
     logger.info("Coordinator shutting down")
@@ -53,6 +60,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(router, prefix="/api/v1")
+    app.include_router(bootstrap_router, prefix="/api/v1")
+    app.include_router(bootstrap_extra_router, prefix="/api/v1")
     app.add_api_websocket_route("/ws/{agent_id}", websocket_endpoint)
 
     @app.get("/health")
