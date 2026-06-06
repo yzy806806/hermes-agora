@@ -18,14 +18,18 @@ async def add_vote(
     vote: str,
     confidence: float = 1.0,
     reason: Optional[str] = None,
+    vote_type: str = "binary",
+    vote_data: Optional[str] = None,
 ) -> int:
     """Add a vote. Returns the auto-generated vote id."""
     now = datetime.utcnow().isoformat()
     await db.execute(
         """INSERT INTO votes
-           (motion_id, agent_id, vote, confidence, reason, timestamp)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        [motion_id, agent_id, vote, confidence, reason, now],
+           (motion_id, agent_id, vote, vote_type, vote_data,
+            confidence, reason, timestamp)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        [motion_id, agent_id, vote, vote_type, vote_data,
+         confidence, reason, now],
     )
     await db.commit()
     async with db.execute("SELECT last_insert_rowid()") as cursor:

@@ -1,6 +1,7 @@
 """WebSocket message handlers for the Agora Coordinator service.
 
 PING, REGISTER, and SPEAK handlers. VOTE handler lives in ws_vote.py.
+Smart discussion assessment lives in ws_smart.py.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from .models import MessageType
 from .state import StateMachine
 from .storage import Storage
 from .ws import ConnectionManager
+from .ws_smart import maybe_assess_round
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +52,7 @@ async def handle_speak(
     agent_id: str, payload: dict, storage: Storage,
     sm: StateMachine, mgr: ConnectionManager,
 ) -> None:
-    """Process SPEAK: validate, store, and broadcast."""
+    """Process SPEAK: validate, store, broadcast, and assess round."""
     motion_id = payload.get("motion_id")
     if not motion_id:
         await _send_error(mgr, agent_id, "missing_motion_id", "motion_id required")
@@ -84,6 +86,9 @@ async def handle_speak(
         "motion_id": motion_id,
         "payload": {"delivered": True},
     })
+
+    # Phase 2: check if round complete and assess
+    await maybe_assess_round(motion_id, storage, sm, mgr)
 
 
 async def _send_error(

@@ -12,18 +12,18 @@
 - [x] Agent 注册/注销
 - [x] 单轮讨论 + 简单多数投票
 
-## Phase 2: 智能讨论
+## Phase 2: 智能讨论 ✅
 
 目标：讨论质量提升，不只是机械轮次
 
-- [ ] Coordinator 智能判断讨论是否充分（不再固定N轮）
+- [x] Coordinator 智能判断讨论是否充分（不再固定N轮）
   - 达成共识 → 提前投票
   - 分歧大 → 继续讨论
   - 跑偏 → 拉回正题
-- [ ] 魔鬼代言人机制（强制引入反对意见）
-- [ ] 分歧点聚焦（只继续讨论未达成共识的点）
-- [ ] 多种投票方式：simple_majority / supermajority / unanimous / weighted
-- [ ] 非二元选择（A方案/B方案/C方案、优先级排序）
+- [x] 魔鬼代言人机制（强制引入反对意见）
+- [x] 分歧点聚焦（只继续讨论未达成共识的点）
+- [x] 多种投票方式：simple_majority / supermajority / unanimous / weighted
+- [x] 非二元选择（A方案/B方案/C方案、优先级排序）
 
 ## Phase 3: 记忆与进化
 

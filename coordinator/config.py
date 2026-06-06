@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     speak_timeout_seconds: int = 120
     vote_timeout_seconds: int = 60
 
+    # Smart discussion configuration
+    smart_discussion_enabled: bool = True
+    devils_advocate_enabled: bool = True
+    max_rounds: int = 5
+    min_messages_for_early_vote: int = 6
+
+    # Assessment thresholds
+    consensus_threshold_high: float = 0.7
+    consensus_threshold_moderate: float = 0.5
+
     # Authentication
     require_api_key: bool = False
     api_key_header: str = "X-Agora-Key"

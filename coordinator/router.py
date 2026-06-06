@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException
 from .models import (
     AgentInfo,
     AgentRegisterRequest,
+    AssessmentResponse,
     Motion,
     MotionCreateRequest,
     MotionHistoryResponse,
@@ -208,3 +209,62 @@ async def get_result(motion_id: str) -> MotionResultResponse:
         rationale=rationale,
         action_items=action_items,
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Smart Discussion & Advanced Voting API
+# ---------------------------------------------------------------------------
+
+
+@router.get("/motions/{motion_id}/assessment",
+            response_model=AssessmentResponse)
+async def get_assessment(motion_id: str) -> AssessmentResponse:
+    """Get the latest assessment for a motion's discussion."""
+    storage = _get_storage()
+    motion = await storage.get_motion(motion_id)
+    if motion is None:
+        raise HTTPException(status_code=404, detail="Motion not found")
+
+    assessment = await storage.get_latest_assessment(motion_id)
+    if assessment is None:
+        raise HTTPException(
+            status_code=404, detail="No assessment found")
+
+    return AssessmentResponse(
+        motion_id=motion_id,
+        result=assessment.get("result", ""),
+        consensus_level=assessment.get("consensus_level", ""),
+        metrics=assessment.get("metrics", {}),
+        rationale=assessment.get("rationale", ""),
+        recommendations=assessment.get("recommendations", []),
+    )
+
+
+@router.post("/motions/{motion_id}/force-vote")
+async def force_vote(motion_id: str) -> dict:
+    """Force a motion into voting phase regardless of round progress."""
+    sm = _get_sm()
+    storage = _get_storage()
+    motion = await storage.get_motion(motion_id)
+    if motion is None:
+        raise HTTPException(status_code=404, detail="Motion not found")
+    if motion["status"] not in ("discussing", "assessing", "devils_advocate"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot force vote from status {motion['status']}")
+
+    try:
+        new_status = await sm.transition(motion_id, "start_voting")
+    except InvalidTransitionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+    await manager.broadcast({
+        "type": "REQUEST_VOTE",
+        "motion_id": motion_id,
+        "payload": {
+            "voting_method": motion.get("voting_method",
+                                        "simple_majority"),
+            "forced": True,
+        },
+    })
+    return {"status": "voting_started", "current_status": new_status.value}

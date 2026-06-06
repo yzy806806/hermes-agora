@@ -1,6 +1,7 @@
 """WebSocket endpoint for the Agora Coordinator service.
 
 Provides the FastAPI WebSocket endpoint and message routing.
+Phase 2: routes DEVILS_ADVOCATE_RESPONSE messages.
 """
 
 from __future__ import annotations
@@ -65,8 +66,40 @@ async def _route_message(agent_id: str, raw: str) -> None:
         await handle_speak(agent_id, payload, storage, sm, manager)
     elif msg_type == MessageType.VOTE:
         await handle_vote(agent_id, payload, storage, sm, manager)
+    elif msg_type == MessageType.DEVILS_ADVOCATE_RESPONSE:
+        await _handle_devils_advocate_response(
+            agent_id, payload, storage, sm, manager)
     else:
         logger.warning("Unknown type from %s: %s", agent_id, msg_type)
+
+
+async def _handle_devils_advocate_response(
+    agent_id: str, payload: dict, storage, sm, mgr,
+) -> None:
+    """Process devil's advocate response: store as a SPEAK message."""
+    motion_id = payload.get("motion_id")
+    if not motion_id:
+        return
+
+    content = payload.get("content", "")
+    round_num = payload.get("round", 1)
+
+    await storage.add_message(
+        motion_id, agent_id, round_num, "oppose", content,
+        [{"source": "devils_advocate"}],
+    )
+
+    await mgr.broadcast({
+        "type": MessageType.BROADCAST,
+        "motion_id": motion_id,
+        "agent_id": agent_id,
+        "payload": {
+            "round": round_num,
+            "stance": "oppose",
+            "content": content,
+            "devils_advocate": True,
+        },
+    })
 
 
 async def on_agent_disconnect(agent_id: str) -> None:

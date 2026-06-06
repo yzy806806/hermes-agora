@@ -36,6 +36,11 @@ class MessageType(str, Enum):
     PONG = "PONG"
     WELCOME = "WELCOME"
     AGENT_OFFLINE = "AGENT_OFFLINE"
+    # Phase 2: smart discussion
+    ASSESSMENT = "ASSESSMENT"
+    TOPIC_REDIRECT = "TOPIC_REDIRECT"
+    DEVILS_ADVOCATE_REQUEST = "DEVILS_ADVOCATE_REQUEST"
+    DEVILS_ADVOCATE_RESPONSE = "DEVILS_ADVOCATE_RESPONSE"
 
 
 class MotionStatus(str, Enum):
@@ -43,6 +48,8 @@ class MotionStatus(str, Enum):
 
     DRAFT = "draft"
     DISCUSSING = "discussing"
+    ASSESSING = "assessing"
+    DEVILS_ADVOCATE = "devils_advocate"
     VOTING = "voting"
     CLOSED = "closed"
 
@@ -54,7 +61,12 @@ class VotingMethod(str, Enum):
     SUPERMAJORITY = "supermajority"
     UNANIMOUS = "unanimous"
     WEIGHTED = "weighted"
-
+    # Phase 2: advanced voting
+    BORDA_COUNT = "borda_count"
+    RANKED_CHOICE = "ranked_choice"
+    APPROVAL = "approval"
+    RANGE = "range"
+    INSTANT_RUNOFF = "instant_runoff"
 
 class Stance(str, Enum):
     """Agent stance on a motion."""
@@ -148,6 +160,9 @@ class MotionCreateRequest(BaseModel):
     context: Optional[str] = None
     rounds: int = 3
     voting_method: VotingMethod = VotingMethod.SIMPLE_MAJORITY
+    # Phase 2: advanced voting options
+    voting_options: Optional[list[str]] = None
+    voting_config: Optional[dict[str, Any]] = None
 
 
 class Motion(BaseModel):
@@ -167,6 +182,13 @@ class Motion(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     closed_at: Optional[datetime] = None
+
+    # Phase 2: smart discussion fields
+    smart_mode: bool = True
+    assessment_config: Optional[dict[str, Any]] = None
+    devils_advocate_count: int = 0
+    focus_areas: list[str] = Field(default_factory=list)
+    early_vote_triggered: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +213,45 @@ class VoteRequest(BaseModel):
     vote: VoteChoice
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     reason: Optional[str] = None
+
+
+# Phase 2: advanced vote request models
+
+class MultipleChoiceVoteRequest(BaseModel):
+    """Request body for multiple-choice voting."""
+
+    motion_id: str
+    type: str = "multiple_choice"
+    vote: str
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    reason: Optional[str] = None
+
+
+class RankingVoteRequest(BaseModel):
+    """Request body for ranked-choice voting."""
+
+    motion_id: str
+    type: str = "ranking"
+    ranking: list[str]
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+
+
+class ApprovalVoteRequest(BaseModel):
+    """Request body for approval voting."""
+
+    motion_id: str
+    type: str = "approval"
+    approved: list[str]
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+
+
+class RangeVoteRequest(BaseModel):
+    """Request body for range/score voting."""
+
+    motion_id: str
+    type: str = "range"
+    scores: dict[str, float]
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -231,3 +292,14 @@ class ErrorResponse(BaseModel):
     code: str
     message: str
     details: Optional[dict[str, Any]] = None
+
+
+class AssessmentResponse(BaseModel):
+    """Response body for motion assessment."""
+
+    motion_id: str
+    result: str
+    consensus_level: str
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    rationale: str = ""
+    recommendations: list[str] = Field(default_factory=list)

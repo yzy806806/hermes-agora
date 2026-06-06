@@ -19,6 +19,13 @@ _TRANSITIONS: dict[tuple[str, str], MotionStatus] = {
     (MotionStatus.DRAFT, "start"): MotionStatus.DISCUSSING,
     (MotionStatus.DISCUSSING, "round_complete"): MotionStatus.DISCUSSING,
     (MotionStatus.DISCUSSING, "start_voting"): MotionStatus.VOTING,
+    (MotionStatus.DISCUSSING, "assess"): MotionStatus.ASSESSING,
+    (MotionStatus.ASSESSING, "needs_devils_advocate"): MotionStatus.DEVILS_ADVOCATE,
+    (MotionStatus.ASSESSING, "start_voting"): MotionStatus.VOTING,
+    (MotionStatus.ASSESSING, "continue_discussion"): MotionStatus.DISCUSSING,
+    (MotionStatus.ASSESSING, "assessment_done"): MotionStatus.DISCUSSING,
+    (MotionStatus.DEVILS_ADVOCATE, "devils_advocate_done"): MotionStatus.DISCUSSING,
+    (MotionStatus.DEVILS_ADVOCATE, "start_voting"): MotionStatus.VOTING,
     (MotionStatus.VOTING, "all_voted"): MotionStatus.CLOSED,
     (MotionStatus.VOTING, "force_close"): MotionStatus.CLOSED,
 }
@@ -35,6 +42,11 @@ class StateMachine:
         draft -> discussing  (event: "start")
         discussing -> discussing  (event: "round_complete", if rounds remain)
         discussing -> voting  (event: "start_voting", when all rounds done)
+        discussing -> assessing  (event: "assess", smart discussion)
+        assessing -> devils_advocate  (event: "needs_devils_advocate")
+        assessing -> discussing  (event: "assessment_done")
+        assessing -> voting  (event: "start_voting")
+        devils_advocate -> discussing  (event: "devils_advocate_done")
         voting -> closed  (event: "all_voted" or "force_close")
     """
 
@@ -92,11 +104,19 @@ class StateMachine:
         """Check whether an agent is allowed to speak on a motion.
 
         Conditions:
-            - Motion exists and is in DISCUSSING status.
+            - Motion exists and is in DISCUSSING, ASSESSING, or
+              DEVILS_ADVOCATE status.
             - Agent is registered in the system.
         """
         motion = await self.storage.get_motion(motion_id)
-        if motion is None or motion["status"] != MotionStatus.DISCUSSING:
+        if motion is None:
+            return False
+        allowed = {
+            MotionStatus.DISCUSSING,
+            MotionStatus.ASSESSING,
+            MotionStatus.DEVILS_ADVOCATE,
+        }
+        if motion["status"] not in allowed:
             return False
         agent = await self.storage.get_agent(agent_id)
         return agent is not None

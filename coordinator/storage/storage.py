@@ -13,6 +13,7 @@ from typing import Optional
 import aiosqlite
 
 from . import agents as _agents
+from . import assessments as _assessments
 from . import messages as _messages
 from . import motions as _motions
 from . import votes as _votes
@@ -135,10 +136,13 @@ class Storage:
 
     async def add_vote(self, motion_id: str, agent_id: str, vote: str,
                        confidence: float = 1.0,
-                       reason: Optional[str] = None) -> int:
+                       reason: Optional[str] = None,
+                       vote_type: str = "binary",
+                       vote_data: Optional[str] = None) -> int:
         async with self._connection() as db:
             return await _votes.add_vote(
-                db, motion_id, agent_id, vote, confidence, reason)
+                db, motion_id, agent_id, vote, confidence, reason,
+                vote_type, vote_data)
 
     async def get_votes(self, motion_id: str) -> list[dict]:
         async with self._connection() as db:
@@ -165,3 +169,26 @@ class Storage:
     async def get_participant_count(self) -> int:
         async with self._connection() as db:
             return await _votes.get_participant_count(db)
+
+    # --- Assessment CRUD ---
+
+    async def save_assessment(
+        self, motion_id: str, round_num: int, result: str,
+        consensus_level: str, metrics: dict, rationale: str,
+    ) -> int:
+        async with self._connection() as db:
+            return await _assessments.save_assessment(
+                db, motion_id, round_num, result,
+                consensus_level, metrics, rationale)
+
+    async def get_latest_assessment(
+        self, motion_id: str,
+    ) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _assessments.get_latest_assessment(db, motion_id)
+
+    async def get_assessments(
+        self, motion_id: str,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _assessments.get_assessments(db, motion_id)
