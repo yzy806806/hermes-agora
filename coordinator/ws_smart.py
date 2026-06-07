@@ -26,7 +26,18 @@ async def maybe_assess_round(
     sm: StateMachine,
     mgr: ConnectionManager,
 ) -> None:
-    """Check if round is complete; if so, run assessment and act."""
+    """Check if round is complete; if so, run assessment and act.
+
+    Verifies all agents have spoken in the current round, runs
+    quality assessment, saves results, broadcasts to participants,
+    and triggers appropriate follow-up actions.
+
+    Args:
+        motion_id: ID of the motion to assess.
+        storage: Storage instance for querying messages.
+        sm: StateMachine for state transitions.
+        mgr: ConnectionManager for broadcasting.
+    """
     motion = await storage.get_motion(motion_id)
     if motion is None:
         return
@@ -94,7 +105,18 @@ async def _act_on_assessment(
     motion_id: str, assessment, storage: Storage,
     sm: StateMachine, mgr: ConnectionManager,
 ) -> None:
-    """Take action based on assessment result."""
+    """Take action based on assessment result.
+
+    Routes to voting on consensus/sufficient, sends topic redirect
+    on off-topic, triggers devil advocate, or continues discussion.
+
+    Args:
+        motion_id: ID of the motion.
+        assessment: AssessmentResult object with result and metrics.
+        storage: Storage instance for data queries.
+        sm: StateMachine for state transitions.
+        mgr: ConnectionManager for broadcasting.
+    """
     result = assessment.result
 
     if result in (AssessmentResult.CONSENSUS_REACHED,
@@ -127,7 +149,15 @@ async def _act_on_assessment(
 async def _transition_to_voting(
     motion_id: str, sm: StateMachine, mgr: ConnectionManager,
 ) -> None:
-    """Move motion to voting phase."""
+    """Move motion to voting phase.
+
+    Transitions the motion state and broadcasts a vote request.
+
+    Args:
+        motion_id: ID of the motion to transition.
+        sm: StateMachine for state transitions.
+        mgr: ConnectionManager for broadcasting.
+    """
     try:
         await sm.transition(motion_id, "start_voting")
         await mgr.broadcast({
@@ -143,7 +173,17 @@ async def _continue_next_round(
     motion_id: str, storage: Storage,
     sm: StateMachine, mgr: ConnectionManager,
 ) -> None:
-    """Continue to next discussion round."""
+    """Continue to next discussion round.
+
+    Increments the round counter if below max rounds, otherwise
+    transitions to voting. Broadcasts round completion.
+
+    Args:
+        motion_id: ID of the motion.
+        storage: Storage instance for round increment.
+        sm: StateMachine for state transitions.
+        mgr: ConnectionManager for broadcasting.
+    """
     motion = await storage.get_motion(motion_id)
     if motion is None:
         return

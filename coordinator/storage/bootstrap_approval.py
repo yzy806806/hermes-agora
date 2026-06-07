@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import aiosqlite
@@ -15,7 +15,7 @@ async def create_approval(
     action_items: Optional[list[dict]] = None,
 ) -> int:
     """Insert an approval request. Returns auto-generated id."""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     items_json = json.dumps(action_items or [])
     await db.execute(
         """INSERT INTO bootstrap_approvals
@@ -37,7 +37,7 @@ async def decide_approval(
 ) -> None:
     """Process an approval decision."""
     status = "approved" if approved else "rejected"
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         """UPDATE bootstrap_approvals
            SET approval_status = ?, approved_by = ?,

@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from .approval_flow import ApprovalFlow
@@ -112,7 +112,7 @@ class BootstrapEngine:
             await update_schedule_run(
                 self.config.db_path,
                 sched["id"],
-                datetime.utcnow().isoformat(),
+                datetime.now(timezone.utc).isoformat(),
                 None,
             )
         return trigger_ids

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Optional
 
 import aiosqlite
@@ -53,7 +54,7 @@ class Storage:
             )
             await db.execute(
                 "INSERT OR IGNORE INTO schema_version VALUES (?, ?)",
-                [SCHEMA_VERSION, __import__("datetime").datetime.utcnow().isoformat()],
+                [SCHEMA_VERSION, datetime.now(timezone.utc).isoformat()],
             )
             await db.commit()
         logger.info("Database initialized at %s", self.db_path)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import aiosqlite
@@ -67,7 +67,7 @@ class TriggerManager:
 
     async def mark_processed(self, trigger_id: str) -> None:
         """Mark a trigger as processed."""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 """UPDATE bootstrap_triggers
@@ -79,7 +79,7 @@ class TriggerManager:
 
     async def mark_failed(self, trigger_id: str) -> None:
         """Mark a trigger as failed."""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 """UPDATE bootstrap_triggers

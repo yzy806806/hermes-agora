@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import aiosqlite
@@ -22,7 +22,7 @@ async def save_assessment(
     rationale: str,
 ) -> int:
     """Save an assessment record. Returns the auto-generated id."""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     metrics_json = json.dumps(metrics)
     await db.execute(
         """INSERT INTO assessments

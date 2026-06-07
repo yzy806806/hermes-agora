@@ -20,7 +20,18 @@ logger = logging.getLogger(__name__)
 
 
 async def websocket_endpoint(websocket: WebSocket, agent_id: str) -> None:
-    """FastAPI WebSocket endpoint at /ws/{agent_id}."""
+    """FastAPI WebSocket endpoint at /ws/{agent_id}.
+    
+    Handles the full lifecycle of an agent's WebSocket connection:
+    connection, message routing, and disconnection cleanup.
+    
+    Args:
+        websocket: FastAPI WebSocket connection object.
+        agent_id: Unique identifier for the connecting agent.
+    
+    Returns:
+        None. Connection is managed until closed.
+    """
     if not await manager.connect(agent_id, websocket):
         return
     try:
@@ -39,7 +50,12 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: str) -> None:
 
 
 async def _route_message(agent_id: str, raw: str) -> None:
-    """Parse and route a WebSocket message to the appropriate handler."""
+    """Parse and route a WebSocket message to the appropriate handler.
+
+    Args:
+        agent_id: ID of the agent that sent the message.
+        raw: Raw JSON string received from the WebSocket.
+    """
     try:
         msg = json.loads(raw)
     except json.JSONDecodeError:
@@ -76,7 +92,15 @@ async def _route_message(agent_id: str, raw: str) -> None:
 async def _handle_devils_advocate_response(
     agent_id: str, payload: dict, storage, sm, mgr,
 ) -> None:
-    """Process devil's advocate response: store as a SPEAK message."""
+    """Process devil's advocate response and store as a SPEAK message.
+
+    Args:
+        agent_id: ID of the responding agent.
+        payload: Message payload with motion_id, content, and round.
+        storage: Storage instance for persisting messages.
+        sm: StateMachine for state transitions.
+        mgr: ConnectionManager for broadcasting.
+    """
     motion_id = payload.get("motion_id")
     if not motion_id:
         return
@@ -103,7 +127,11 @@ async def _handle_devils_advocate_response(
 
 
 async def on_agent_disconnect(agent_id: str) -> None:
-    """Mark agent offline and notify others."""
+    """Mark agent offline and notify others.
+
+    Args:
+        agent_id: ID of the disconnected agent.
+    """
     if manager._storage is not None:
         await manager._storage.set_agent_online(agent_id, False)
     await manager.broadcast({

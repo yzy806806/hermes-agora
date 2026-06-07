@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -64,7 +64,7 @@ class MemorySync:
             participants=sorted({m.get("agent_id", "") for m in messages} - {""}),
             voting_method=motion.get("voting_method", "simple_majority"),
             votes_summary=self._summarize_votes(votes),
-            created_at=str(motion.get("closed_at") or datetime.utcnow().isoformat()),
+            created_at=str(motion.get("closed_at") or datetime.now(timezone.utc).isoformat()),
         )
 
     async def _write_to_memory(self, conclusion: DiscussionConclusion) -> None:

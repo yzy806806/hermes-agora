@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import aiohttp
@@ -33,7 +33,7 @@ class DiscussionResult:
     confidence: float = 0.0
     rationale: str = ""
     risk_assessment: dict = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class DiscussionDriver:
@@ -122,8 +122,8 @@ class DiscussionDriver:
         self, motion_id: str, timeout: int = 3600,
     ) -> DiscussionResult:
         """Poll until the discussion closes or timeout."""
-        start = datetime.utcnow()
-        while (datetime.utcnow() - start).seconds < timeout:
+        start = datetime.now(timezone.utc)
+        while (datetime.now(timezone.utc) - start).seconds < timeout:
             result = await self._check_motion_status(motion_id)
             if result is not None:
                 return result

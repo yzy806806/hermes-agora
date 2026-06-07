@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
@@ -35,7 +35,7 @@ class ApprovalFlow:
         action_items: Optional[list[dict]] = None,
     ) -> str:
         """Create an approval request for a motion result. Returns approval id."""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         items_json = json.dumps(action_items or [], ensure_ascii=False)
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute(
@@ -116,7 +116,7 @@ class ApprovalFlow:
         feedback: Optional[str] = None,
     ) -> dict:
         """Process an approval decision."""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         status = (
             ApprovalStatus.APPROVED.value
             if approved

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import aiosqlite
@@ -22,7 +22,7 @@ async def add_message(
     evidence: list[dict] | None = None,
 ) -> int:
     """Add a message. Returns the auto-generated message id."""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     evidence_json = json.dumps(evidence or [])
     await db.execute(
         """INSERT INTO messages

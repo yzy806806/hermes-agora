@@ -1,6 +1,6 @@
 [project]
 name = "hermes-agora"
-version = "0.4.0"
+version = "0.4.1"
 description = "Multi-Agent Deliberation Framework for Hermes"
 readme = "README.md"
 license = {text = "MIT"}

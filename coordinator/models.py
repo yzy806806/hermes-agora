@@ -5,7 +5,7 @@ Defines all request/response models, enums, and WebSocket message types.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 
@@ -113,7 +113,7 @@ class WSMessage(BaseModel):
     type: MessageType
     motion_id: Optional[str] = None
     agent_id: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -142,7 +142,7 @@ class AgentInfo(BaseModel):
     model: str = ""
     capabilities: list[str] = Field(default_factory=list)
     role: AgentRole = AgentRole.PARTICIPANT
-    registered_at: datetime = Field(default_factory=datetime.utcnow)
+    registered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_online: bool = False
     last_seen: Optional[datetime] = None
 
@@ -179,8 +179,8 @@ class Motion(BaseModel):
     decision: Optional[Decision] = None
     rationale: Optional[str] = None
     action_items: list[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     closed_at: Optional[datetime] = None
 
     # Phase 2: smart discussion fields

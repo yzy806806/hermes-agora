@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import aiosqlite
@@ -13,7 +13,7 @@ async def create_trigger(
     source: str, context: str, priority: int = 0,
 ) -> int:
     """Insert a bootstrap trigger. Returns auto-generated id."""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         """INSERT INTO bootstrap_triggers
            (trigger_type, topic, source, context,
@@ -46,7 +46,7 @@ async def update_trigger_status(
     status: str,
 ) -> None:
     """Update trigger status and set processed_at."""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         """UPDATE bootstrap_triggers
            SET status = ?, processed_at = ? WHERE id = ?""",

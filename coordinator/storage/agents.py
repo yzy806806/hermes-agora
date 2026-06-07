@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import aiosqlite
@@ -23,7 +23,7 @@ async def register_agent(
 ) -> dict:
     """Register a new agent. Returns dict with agent_id and registered_at."""
     caps_json = json.dumps(capabilities or [])
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         """INSERT INTO agents
            (agent_id, name, hermes_endpoint, model,
@@ -62,7 +62,7 @@ async def set_agent_online(
     db: aiosqlite.Connection, agent_id: str, online: bool
 ) -> None:
     """Set agent online status and update last_seen_at."""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         "UPDATE agents SET is_online = ?, last_seen_at = ? WHERE agent_id = ?",
         [1 if online else 0, now, agent_id],

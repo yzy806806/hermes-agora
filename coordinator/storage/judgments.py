@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import aiosqlite
@@ -21,7 +21,7 @@ async def record_judgment(
 ) -> int:
     """Insert a judgment record. Returns the auto-generated id."""
     is_correct = 1 if predicted == actual else 0
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         """INSERT INTO judgment_records
            (motion_id, agent_id, predicted, actual,

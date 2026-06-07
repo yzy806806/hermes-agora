@@ -1,5 +1,5 @@
 name: agora
-version: "0.4.0"
+version: "0.4.1"
 description: "Multi-Agent Deliberation Plugin for Hermes — enables structured discussion, negotiation, and voting among multiple Hermes Agents. Each participant is a full Hermes instance with memory, skills, and self-evolution capabilities."
 author: yzy806806
 kind: backend

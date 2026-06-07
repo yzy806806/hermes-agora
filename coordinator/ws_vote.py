@@ -28,7 +28,19 @@ async def handle_vote(
     agent_id: str, payload: dict, storage: Storage,
     sm: StateMachine, mgr: ConnectionManager,
 ) -> None:
-    """Process VOTE: validate, store, confirm, and check completion."""
+    """Process VOTE: validate, store, confirm, and check completion.
+
+    Validates the agent can vote and the vote format matches the
+    motion voting method, persists the vote, sends confirmation,
+    and checks if all online agents have voted.
+
+    Args:
+        agent_id: ID of the voting agent.
+        payload: Vote payload (motion_id, type, vote/ranking/etc).
+        storage: Storage instance for persisting votes.
+        sm: StateMachine for checking vote permissions.
+        mgr: ConnectionManager for sending confirmation.
+    """
     motion_id = payload.get("motion_id")
     if not motion_id:
         await _send_error(mgr, agent_id, "missing_motion_id", "motion_id required")
@@ -77,7 +89,16 @@ async def handle_vote(
 def _validate_vote_format(
     voting_method: str, vote_type: str, payload: dict,
 ) -> bool:
-    """Check if vote format matches the voting method."""
+    """Check if vote format matches the voting method.
+
+    Args:
+        voting_method: Configured voting method string.
+        vote_type: Type of vote in the payload (binary/ranking/etc).
+        payload: Full vote payload for field validation.
+
+    Returns:
+        True if the format is valid for the method, False otherwise.
+    """
     try:
         method = VotingMethod(voting_method)
     except ValueError:
@@ -101,7 +122,15 @@ def _validate_vote_format(
 def _extract_vote_data(
     vote_type: str, payload: dict,
 ) -> tuple[str, dict | None]:
-    """Extract vote value and structured data from payload."""
+    """Extract vote value and structured data from payload.
+
+    Args:
+        vote_type: Type of vote (binary/ranking/approval/range/etc).
+        payload: Full vote payload.
+
+    Returns:
+        Tuple of (vote_value, vote_data_dict_or_None).
+    """
     if vote_type == "binary":
         return payload.get("vote", "abstain"), None
     elif vote_type == "ranking":
@@ -122,7 +151,17 @@ async def _check_all_voted(
     motion_id: str, storage: Storage,
     sm: StateMachine, mgr: ConnectionManager,
 ) -> None:
-    """Check if all online agents have voted, then close."""
+    """Check if all online agents have voted, then close motion.
+
+    Queries all online agents and their vote status. If all have
+    voted, transitions the motion and broadcasts the result.
+
+    Args:
+        motion_id: ID of the motion to check.
+        storage: Storage instance for querying votes.
+        sm: StateMachine for state transitions.
+        mgr: ConnectionManager for broadcasting results.
+    """
     online_agents = await storage.list_agents(online_only=True)
     all_voted = True
     for ag in online_agents:

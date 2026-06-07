@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import aiosqlite
@@ -23,7 +23,7 @@ async def create_motion(
 ) -> dict:
     """Create a new motion. Returns dict with id and created_at."""
     motion_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         """INSERT INTO motions
            (id, title, description, context, rounds, voting_method,
@@ -73,7 +73,7 @@ async def update_motion_status(
     action_items: Optional[list[str]] = None,
 ) -> None:
     """Update motion status and optional fields."""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     updates = ["status = ?", "updated_at = ?"]
     params: list = [status, now]
     if decision is not None:
@@ -99,7 +99,7 @@ async def increment_round(
     db: aiosqlite.Connection, motion_id: str
 ) -> int:
     """Increment motion round. Returns new round number."""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         "UPDATE motions SET current_round = current_round + 1, updated_at = ? WHERE id = ?",
         [now, motion_id],

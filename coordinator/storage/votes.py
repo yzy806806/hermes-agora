@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import aiosqlite
@@ -22,7 +22,7 @@ async def add_vote(
     vote_data: Optional[str] = None,
 ) -> int:
     """Add a vote. Returns the auto-generated vote id."""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         """INSERT INTO votes
            (motion_id, agent_id, vote, vote_type, vote_data,

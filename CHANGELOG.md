@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.1 (2026-06-07)
+
+### Added
+- **Phase 5 Code Quality Improvements**: Comprehensive code cleanup and test coverage enhancements
+
+### Fixed
+- Fixed 24 `datetime.utcnow()` to `datetime.now(timezone.utc)` - resolved DeprecationWarning in Python 3.12+
+
+### Changed
+- Added complete docstrings to 16 functions in:
+  - `ws_endpoint/` - WebSocket endpoint handlers
+  - `ws_handlers/` - WebSocket message handlers  
+  - `ws_vote/` - Voting logic handlers
+  - `ws_smart/` - Smart discussion handlers
+
+### Tests
+- Added 15 new test cases across 3 files
+- Test coverage: 77% → 81%
+- All 334 tests passing
+
+---
+
 ## v0.4.0 (2026-06-07)
 
 ### Added

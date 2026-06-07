@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import aiosqlite
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 async def check_scheduled_triggers(db_path: str) -> list[dict]:
     """Return due scheduled triggers (next_run <= now or NULL)."""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
