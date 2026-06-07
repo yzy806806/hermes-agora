@@ -19,6 +19,9 @@ from .router import init_deps, router
 from .state import StateMachine
 from .storage import Storage
 from .ws_endpoint import websocket_endpoint
+from .ws import manager
+from .heartbeat import HeartbeatManager
+from .timeout import TimeoutConfig, TimeoutManager
 from .bootstrap import BootstrapConfig, BootstrapEngine
 from .bootstrap.routes import router as bootstrap_router
 from .bootstrap.routes_extra import router as bootstrap_extra_router
@@ -40,8 +43,21 @@ async def lifespan(app: FastAPI):
     bootstrap_cfg = BootstrapConfig(db_path=settings.db_path)
     bootstrap_engine = BootstrapEngine(bootstrap_cfg)
     bootstrap_engine.init_routes()
+    # Heartbeat & Timeout init
+    heartbeat_mgr = HeartbeatManager(manager)
+    timeout_cfg = TimeoutConfig(
+        round_timeout=settings.round_timeout_seconds,
+        vote_timeout=settings.vote_timeout_seconds,
+        discussion_timeout=settings.discussion_timeout_seconds,
+    )
+    timeout_mgr = TimeoutManager(config=timeout_cfg)
+    app.state.heartbeat_mgr = heartbeat_mgr
+    app.state.timeout_mgr = timeout_mgr
+    await heartbeat_mgr.start_heartbeat(interval=settings.heartbeat_interval_seconds)
     logger.info("Coordinator started (db=%s)", settings.db_path)
     yield
+    # Cleanup
+    await heartbeat_mgr.stop()
     logger.info("Coordinator shutting down")
 
 

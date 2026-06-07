@@ -48,6 +48,20 @@
 - [x] Task Generator - 从讨论结论生成任务
 - [x] Approval Flow - 用户审批工作流
 
+## Phase 5: 容错与安全 ✅
+
+目标：系统稳定性和安全性
+
+- [x] 心跳机制（Heartbeat）- Agent 连接监控 PING/PONG
+- [x] 超时处理（Timeout）- 讨论超时处理
+- [x] 死锁预防（Deadlock Prevention）- 循环依赖检测
+- [x] 输入验证（Input Validation）- 输入清理和速率限制
+- [x] HeartbeatManager 和 TimeoutManager 集成
+- [x] TimeoutConfig 配置项添加
+- [x] WebSocket 死锁检测钩子
+- [x] 代码质量提升：24个 datetime.utcnow() 修复，16个函数添加文档字符串
+- [x] 测试覆盖率：77% → 81%
+
 ## 待讨论的设计问题
 
 1. **讨论质量保证**：如何确保讨论不流于形式？魔鬼代言人角色如何实现？

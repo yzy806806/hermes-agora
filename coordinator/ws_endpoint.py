@@ -11,12 +11,17 @@ import logging
 
 from fastapi import WebSocket
 
+from .input_validation import InputValidator
 from .models import MessageType
+from .rate_limiter import RateLimiter
 from .ws import manager
 from .ws_handlers import handle_ping, handle_register, handle_speak
 from .ws_vote import handle_vote
 
 logger = logging.getLogger(__name__)
+
+_validator = InputValidator()
+_rate_limiter = RateLimiter()
 
 
 async def websocket_endpoint(websocket: WebSocket, agent_id: str) -> None:
@@ -79,8 +84,36 @@ async def _route_message(agent_id: str, raw: str) -> None:
     elif msg_type == MessageType.REGISTER:
         await handle_register(agent_id, payload, storage, manager)
     elif msg_type == MessageType.SPEAK:
+        if not _rate_limiter.check_rate(agent_id, "speak"):
+            await manager.send(agent_id, {
+                "type": MessageType.ERROR,
+                "payload": {"code": "rate_limited", "message": "Speak rate exceeded"},
+            })
+            return
+        try:
+            payload = _validator.validate_speak_payload(payload)
+        except ValueError as exc:
+            await manager.send(agent_id, {
+                "type": MessageType.ERROR,
+                "payload": {"code": "validation_error", "message": str(exc)},
+            })
+            return
         await handle_speak(agent_id, payload, storage, sm, manager)
     elif msg_type == MessageType.VOTE:
+        if not _rate_limiter.check_rate(agent_id, "vote"):
+            await manager.send(agent_id, {
+                "type": MessageType.ERROR,
+                "payload": {"code": "rate_limited", "message": "Vote rate exceeded"},
+            })
+            return
+        try:
+            payload = _validator.validate_vote_payload(payload)
+        except ValueError as exc:
+            await manager.send(agent_id, {
+                "type": MessageType.ERROR,
+                "payload": {"code": "validation_error", "message": str(exc)},
+            })
+            return
         await handle_vote(agent_id, payload, storage, sm, manager)
     elif msg_type == MessageType.DEVILS_ADVOCATE_RESPONSE:
         await _handle_devils_advocate_response(

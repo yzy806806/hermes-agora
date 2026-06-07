@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.5.0 (2026-06-07)
+
+### Added
+- **Phase 5 Fault Tolerance and Security**: Comprehensive system resilience and input protection
+  - `coordinator/heartbeat.py`: Agent connection monitoring (PING/PONG)
+  - `coordinator/timeout.py`: Discussion timeout handling
+  - `coordinator/deadlock_prevention.py`: Circular dependency detection
+  - `coordinator/input_validation.py`: Input sanitization and rate limiting
+
+- **Integration**: HeartbeatManager and TimeoutManager startup in coordinator/main.py
+- **Configuration**: TimeoutConfig added to coordinator/config.py
+- **WebSocket**: Deadlock detection hooks in ws_handlers.py, input validation in ws_endpoint.py
+
+### Changed
+- Fixed 24 `datetime.utcnow()` to `datetime.now(timezone.utc)` - resolved DeprecationWarning in Python 3.12+
+- Added complete docstrings to 16 functions
+
+### Tests
+- Test coverage: 77% → 81%
+- All 391 tests passing
+
+---
+
 ## v0.4.1 (2026-06-07)
 
 ### Added

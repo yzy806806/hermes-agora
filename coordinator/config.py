@@ -40,6 +40,16 @@ class Settings(BaseSettings):
     require_api_key: bool = False
     api_key_header: str = "X-Agora-Key"
 
+    # Heartbeat configuration
+    heartbeat_interval_seconds: int = 30
+    heartbeat_timeout_seconds: int = 10
+    heartbeat_max_missed: int = 3
+
+    # Timeout configuration
+    round_timeout_seconds: int = 300
+    vote_timeout_seconds: int = 120
+    discussion_timeout_seconds: int = 1800
+
     model_config = {"env_prefix": "AGORA_"}
 
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 
+from .deadlock_prevention import DeadlockDetector
 from .models import MessageType
 from .state import StateMachine
 from .storage import Storage
@@ -15,6 +16,8 @@ from .ws import ConnectionManager
 from .ws_smart import maybe_assess_round
 
 logger = logging.getLogger(__name__)
+
+_deadlock_detector = DeadlockDetector()
 
 
 async def handle_ping(
@@ -116,6 +119,13 @@ async def handle_speak(
 
     # Phase 2: check if round complete and assess
     await maybe_assess_round(motion_id, storage, sm, mgr)
+
+    # Deadlock detection: track references and check for cycles
+    _deadlock_detector.track_reference(agent_id, motion_id, str(round_num))
+    for risk_a, risk_b, status in _deadlock_detector.get_deadlock_risk():
+        if status.value == "deadlock":
+            break_msg = _deadlock_detector.inject_break_signal(risk_a, risk_b)
+            await mgr.broadcast(break_msg)
 
 
 async def _send_error(
