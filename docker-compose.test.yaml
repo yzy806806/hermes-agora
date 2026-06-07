@@ -1,0 +1,35 @@
+# Agora Integration Test Environment
+#
+# Usage:
+#   Unit tests only:     docker compose -f docker-compose.test.yaml run --rm tests
+#   Coordinator + tests: docker compose -f docker-compose.test.yaml up
+#   Clean up:            docker compose -f docker-compose.test.yaml down -v
+
+services:
+  coordinator:
+    build: .
+    command: ["uv", "run", "python", "-m", "coordinator.main"]
+    ports:
+      - "8765:8765"
+    environment:
+      - AGORA_DB_PATH=/app/data/agora.db
+    volumes:
+      - agora-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  tests:
+    build: .
+    command: ["uv", "run", "pytest", "-x", "-q", "--tb=short"]
+    depends_on:
+      coordinator:
+        condition: service_healthy
+    environment:
+      - AGORA_COORDINATOR_URL=http://coordinator:8765
+      - AGORA_AGENT_ID=test-agent-1
+
+volumes:
+  agora-data:

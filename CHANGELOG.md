@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.6.0 (2026-06-07)
+
+### Added
+- **Phase 6 Discussion Quality and Efficiency Enhancement**: Comprehensive quality guard and efficiency improvements
+  - `coordinator/quality_guard.py`: Discussion quality monitoring and enforcement
+  - `coordinator/quality_guard_models.py`: Data models for quality tracking
+  - `coordinator/quality_guard_checks.py`: Quality check implementations
+  - `coordinator/quality_scorer.py`: Discussion scoring engine
+  - `coordinator/realtime_evaluator.py`: Real-time discussion evaluation
+  - `coordinator/consensus_jump.py`: Accelerated consensus detection
+  - `coordinator/dynamic_rounds.py`: Adaptive round management
+  - `coordinator/model_capabilities.py`: Model capability tracking
+  - `coordinator/role_assigner.py`: Dynamic role assignment
+  - `coordinator/perspective_ensurer.py`: Perspective diversity enforcement
+
+- **Tests**: 9 new test suites for Phase 6 modules
+- **Configuration**: Updated config.py and models.py for new features
+- **Documentation**: DESIGN-quality-efficiency.md
+
+### Changed
+- Improved assessment.py with quality-aware discussion evaluation
+- Enhanced devils_advocate.py with perspective diversity
+- Optimized smart_scheduler.py for dynamic round management
+
 ## v0.5.0 (2026-06-07)
 
 ### Added

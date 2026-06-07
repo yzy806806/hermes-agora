@@ -11,6 +11,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from .models import Stance
+from .quality_scorer import QualityScore, QualityScorer
 
 if TYPE_CHECKING:
     from .storage import Storage
@@ -40,6 +41,7 @@ class DiscussionMetrics:
     stance_distribution: dict[Stance, int]
     argument_quality_score: float
     topic_relevance_score: float
+    quality_score: QualityScore | None = None
     key_points_identified: list[str] = field(default_factory=list)
     unresolved_points: list[str] = field(default_factory=list)
 
@@ -87,6 +89,9 @@ class ConsensusDetector:
 class QualityAssessor:
     """Assesses discussion quality and makes scheduling decisions."""
 
+    def __init__(self) -> None:
+        self._scorer = QualityScorer()
+
     async def assess(self, motion_id: str, storage: Storage) -> Assessment:
         """Assess discussion quality for a motion."""
         messages = await storage.get_messages(motion_id)
@@ -101,11 +106,14 @@ class QualityAssessor:
         key_points = self._extract_key_points(messages)
         unresolved = self._identify_unresolved(messages)
 
+        qs = await self._scorer.score(motion_id, storage)
+
         metrics = DiscussionMetrics(
             total_messages=len(messages),
             stance_distribution=stance_counts,
             argument_quality_score=quality_score,
             topic_relevance_score=relevance_score,
+            quality_score=qs,
             key_points_identified=key_points,
             unresolved_points=unresolved,
         )

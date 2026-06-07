@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -11,6 +11,7 @@ from coordinator.devils_advocate import (
     DevilsAdvocateManager,
 )
 from coordinator.models import Stance
+from coordinator.quality_guard_models import QualityGuardConfig
 
 
 @pytest.fixture
@@ -18,15 +19,11 @@ def mock_storage():
     s = AsyncMock()
     s.get_messages = AsyncMock(return_value=[])
     s.get_motion = AsyncMock(return_value={
-        "id": "m1",
-        "title": "Test Motion",
-        "description": "A test",
-        "current_round": 1,
+        "id": "m1", "title": "Test Motion",
+        "description": "A test", "current_round": 1,
     })
     s.list_agents = AsyncMock(return_value=[
-        {"agent_id": "a1"},
-        {"agent_id": "a2"},
-        {"agent_id": "a3"},
+        {"agent_id": "a1"}, {"agent_id": "a2"}, {"agent_id": "a3"},
     ])
     return s
 
@@ -36,12 +33,22 @@ def mock_ws():
     return AsyncMock()
 
 
+def _make_no_alert_guard(storage):
+    """Create a QualityGuard that always returns empty alerts."""
+    from coordinator.quality_guard import QualityGuard
+    guard = MagicMock(spec=QualityGuard)
+    guard.check_quality = AsyncMock(return_value=[])
+    guard.config = QualityGuardConfig()
+    return guard
+
+
 class TestDevilsAdvocateConfig:
     def test_defaults(self):
         c = DevilsAdvocateConfig()
         assert c.enabled is True
         assert c.trigger_threshold == 0.7
         assert c.max_triggers_per_motion == 2
+        assert c.quality_trigger_severity == 0.7
 
 
 class TestDevilsAdvocateManager:
@@ -56,21 +63,23 @@ class TestDevilsAdvocateManager:
     @pytest.mark.asyncio
     async def test_too_few_messages(self, mock_storage, mock_ws):
         mock_storage.get_messages = AsyncMock(return_value=[
-            {"agent_id": "a1", "stance": Stance.SUPPORT},
+            {"agent_id": "a1", "stance": Stance.SUPPORT, "content": "short"},
         ])
-        mgr = DevilsAdvocateManager(mock_storage, mock_ws)
+        guard = _make_no_alert_guard(mock_storage)
+        mgr = DevilsAdvocateManager(mock_storage, mock_ws, quality_guard=guard)
         should, agent = await mgr.should_trigger("m1")
         assert should is False
 
     @pytest.mark.asyncio
     async def test_max_triggers_reached(self, mock_storage, mock_ws):
         mock_storage.get_messages = AsyncMock(return_value=[
-            {"agent_id": "a1", "stance": Stance.SUPPORT},
-            {"agent_id": "a2", "stance": Stance.SUPPORT},
-            {"agent_id": "a3", "stance": Stance.SUPPORT},
+            {"agent_id": "a1", "stance": Stance.SUPPORT, "content": "x" * 60},
+            {"agent_id": "a2", "stance": Stance.SUPPORT, "content": "y" * 60},
+            {"agent_id": "a3", "stance": Stance.SUPPORT, "content": "z" * 60},
         ])
+        guard = _make_no_alert_guard(mock_storage)
         cfg = DevilsAdvocateConfig(max_triggers_per_motion=2)
-        mgr = DevilsAdvocateManager(mock_storage, mock_ws, cfg)
+        mgr = DevilsAdvocateManager(mock_storage, mock_ws, cfg, guard)
         mgr._trigger_count["m1"] = 2
         should, agent = await mgr.should_trigger("m1")
         assert should is False
@@ -78,45 +87,44 @@ class TestDevilsAdvocateManager:
     @pytest.mark.asyncio
     async def test_support_below_threshold(self, mock_storage, mock_ws):
         mock_storage.get_messages = AsyncMock(return_value=[
-            {"agent_id": "a1", "stance": Stance.SUPPORT},
-            {"agent_id": "a2", "stance": Stance.OPPOSE},
-            {"agent_id": "a3", "stance": Stance.NEUTRAL},
+            {"agent_id": "a1", "stance": Stance.SUPPORT, "content": "x" * 60},
+            {"agent_id": "a2", "stance": Stance.OPPOSE, "content": "y" * 60},
+            {"agent_id": "a3", "stance": Stance.NEUTRAL, "content": "z" * 60},
         ])
-        mgr = DevilsAdvocateManager(mock_storage, mock_ws)
+        guard = _make_no_alert_guard(mock_storage)
+        mgr = DevilsAdvocateManager(mock_storage, mock_ws, quality_guard=guard)
         should, agent = await mgr.should_trigger("m1")
         assert should is False
 
     @pytest.mark.asyncio
     async def test_triggers_when_support_high(self, mock_storage, mock_ws):
         mock_storage.get_messages = AsyncMock(return_value=[
-            {"agent_id": "a1", "stance": Stance.SUPPORT},
-            {"agent_id": "a2", "stance": Stance.SUPPORT},
-            {"agent_id": "a3", "stance": Stance.SUPPORT},
+            {"agent_id": "a1", "stance": Stance.SUPPORT, "content": "x" * 60},
+            {"agent_id": "a2", "stance": Stance.SUPPORT, "content": "y" * 60},
+            {"agent_id": "a3", "stance": Stance.SUPPORT, "content": "z" * 60},
         ])
-        mgr = DevilsAdvocateManager(mock_storage, mock_ws)
+        guard = _make_no_alert_guard(mock_storage)
+        mgr = DevilsAdvocateManager(mock_storage, mock_ws, quality_guard=guard)
         should, agent = await mgr.should_trigger("m1")
         assert should is True
         assert agent in {"a1", "a2", "a3"}
 
     @pytest.mark.asyncio
     async def test_excludes_already_opposed(self, mock_storage, mock_ws):
-        # 3 support, 1 oppose = 75% support, above threshold
         mock_storage.get_messages = AsyncMock(return_value=[
-            {"agent_id": "a1", "stance": Stance.SUPPORT},
-            {"agent_id": "a2", "stance": Stance.SUPPORT},
-            {"agent_id": "a3", "stance": Stance.SUPPORT},
-            {"agent_id": "a4", "stance": Stance.OPPOSE},
+            {"agent_id": "a1", "stance": Stance.SUPPORT, "content": "x" * 60},
+            {"agent_id": "a2", "stance": Stance.SUPPORT, "content": "y" * 60},
+            {"agent_id": "a3", "stance": Stance.SUPPORT, "content": "z" * 60},
+            {"agent_id": "a4", "stance": Stance.OPPOSE, "content": "w" * 60},
         ])
         mock_storage.list_agents = AsyncMock(return_value=[
-            {"agent_id": "a1"},
-            {"agent_id": "a2"},
-            {"agent_id": "a3"},
-            {"agent_id": "a4"},
+            {"agent_id": "a1"}, {"agent_id": "a2"},
+            {"agent_id": "a3"}, {"agent_id": "a4"},
         ])
-        mgr = DevilsAdvocateManager(mock_storage, mock_ws)
+        guard = _make_no_alert_guard(mock_storage)
+        mgr = DevilsAdvocateManager(mock_storage, mock_ws, quality_guard=guard)
         should, agent = await mgr.should_trigger("m1")
         assert should is True
-        # a4 already opposed, so should pick from a1, a2, a3
         assert agent in {"a1", "a2", "a3"}
 
     @pytest.mark.asyncio

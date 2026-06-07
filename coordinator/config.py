@@ -32,6 +32,23 @@ class Settings(BaseSettings):
     max_rounds: int = 5
     min_messages_for_early_vote: int = 6
 
+    # Realtime evaluation
+    realtime_eval_enabled: bool = True
+    realtime_consensus_threshold: float = 0.8
+    realtime_min_messages: int = 3
+
+    # Consensus jump
+    consensus_jump_enabled: bool = True
+    consensus_jump_ratio: float = 0.7
+
+    # Dynamic rounds
+    dynamic_rounds_enabled: bool = True
+    dynamic_min_rounds: int = 2
+    dynamic_max_rounds: int = 5
+    dynamic_adaptive: bool = True
+    dynamic_quality_threshold: float = 0.7
+    dynamic_low_quality_threshold: float = 0.4
+
     # Assessment thresholds
     consensus_threshold_high: float = 0.7
     consensus_threshold_moderate: float = 0.5

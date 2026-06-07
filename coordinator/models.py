@@ -94,6 +94,17 @@ class AgentRole(str, Enum):
     OBSERVER = "observer"
 
 
+class DiscussionRole(str, Enum):
+    """Discussion roles for multi-model diversity (Phase 6.5)."""
+
+    SUPPORT_ADVOCATE = "support_advocate"
+    OPPOSE_ADVOCATE = "oppose_advocate"
+    EXPERT = "expert"
+    NEUTRAL = "neutral"
+    FACT_CHECKER = "fact_checker"
+    CREATIVE = "creative"
+
+
 class Decision(str, Enum):
     """Final decision outcomes."""
 
