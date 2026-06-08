@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.7.0 (2026-06-08)
+
+### Added
+- **Integration Test Infrastructure**: E2E integration tests with real WebSocket coordinator
+  - `tests/integration/conftest.py`: Shared fixtures (live coordinator, websocket clients)
+  - `tests/integration/test_e2e_basic.py`: Basic motion create/discuss/vote flow
+  - `tests/integration/test_e2e_multiple.py`: Multi-agent concurrent discussion
+  - `tests/integration/test_e2e_reconnect.py`: WebSocket reconnection and state recovery
+  - `tests/integration/test_smoke.py`: Quick smoke/healthcheck tests
+  - Pytest config with `integration` marker and asyncio auto mode
+
+- **Plugin Hooks**: Hermes plugin lifecycle integration
+  - `on_session_start`: Initialize agent connections on session start
+  - `on_session_end`: Clean up agent connections on session end
+  - `post_tool_call`: Post-process tool call results
+
+- **Docker Production Deployment**: Multi-stage Docker build for production
+  - Multi-stage Dockerfile: builder stage → production stage with minimal image
+  - `docker-compose.prod.yaml`: Production orchestration with coordinator service
+  - CMD simplification for production entrypoint
+
+- **Documentation**:
+  - `docs/ARCHITECTURE.md`: Updated architecture documentation
+  - `docs/API.md`: API reference documentation
+  - `docs/DESIGN-phase7.md`: Phase 7 design document
+
+### Fixed
+- Docker test stage configuration and CMD simplification
+- Cleaned up AsyncMock garbage files from project root
+
+### Changed
+- Updated `pyproject.toml` to v0.7.0
+- Updated `plugin.yaml` with hooks metadata
+- Updated `README.md` with latest features
+- Updated `.dockerignore` for production builds
+- Enhanced `__init__.py` with plugin lifecycle hooks
+- Enhanced `agent_client/client.py` with reconnection support
+- Enhanced `coordinator/storage/agents.py` and `motions.py` storage layer
+
 ## v0.6.0 (2026-06-07)
 
 ### Added

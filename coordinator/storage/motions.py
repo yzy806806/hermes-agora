@@ -12,6 +12,17 @@ import aiosqlite
 
 logger = logging.getLogger(__name__)
 
+# Keys that may be NULL in DB but need to be [] for Pydantic
+_LIST_KEYS = ("action_items", "focus_areas")
+
+
+def _normalize_motion(data: dict) -> dict:
+    """Replace NULL list fields with empty lists for Pydantic."""
+    for key in _LIST_KEYS:
+        if key in data and data[key] is None:
+            data[key] = []
+    return data
+
 
 async def create_motion(
     db: aiosqlite.Connection,
@@ -21,7 +32,7 @@ async def create_motion(
     voting_method: str = "simple_majority",
     context: str = "",
 ) -> dict:
-    """Create a new motion. Returns dict with id and created_at."""
+    """Create a new motion. Returns full motion dict."""
     motion_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     await db.execute(
@@ -32,7 +43,11 @@ async def create_motion(
         [motion_id, title, description, context, rounds, voting_method, now, now],
     )
     await db.commit()
-    return {"id": motion_id, "created_at": now}
+    async with db.execute(
+        "SELECT * FROM motions WHERE id = ?", [motion_id]
+    ) as cursor:
+        row = await cursor.fetchone()
+        return _normalize_motion(dict(row)) if row else {"id": motion_id}
 
 
 async def get_motion(
@@ -43,7 +58,9 @@ async def get_motion(
         "SELECT * FROM motions WHERE id = ?", [motion_id]
     ) as cursor:
         row = await cursor.fetchone()
-        return dict(row) if row else None
+        if row is None:
+            return None
+        return _normalize_motion(dict(row))
 
 
 async def list_motions(
@@ -61,7 +78,7 @@ async def list_motions(
     query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
     async with db.execute(query, params) as cursor:
-        return [dict(row) async for row in cursor]
+        return [_normalize_motion(dict(r)) async for r in cursor]
 
 
 async def update_motion_status(

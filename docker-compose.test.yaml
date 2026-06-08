@@ -7,12 +7,17 @@
 
 services:
   coordinator:
-    build: .
-    command: ["uv", "run", "python", "-m", "coordinator.main"]
+    build:
+      context: .
+      target: coordinator
+    command: ["agora-coordinator"]
     ports:
       - "8765:8765"
     environment:
+      - AGORA_HOST=0.0.0.0
+      - AGORA_PORT=8765
       - AGORA_DB_PATH=/app/data/agora.db
+      - AGORA_LOG_LEVEL=warning
     volumes:
       - agora-data:/app/data
     healthcheck:
@@ -22,14 +27,17 @@ services:
       retries: 10
 
   tests:
-    build: .
-    command: ["uv", "run", "pytest", "-x", "-q", "--tb=short"]
+    build:
+      context: .
+      target: testing
+    command: ["pytest", "-x", "-q", "--tb=short"]
     depends_on:
       coordinator:
         condition: service_healthy
     environment:
       - AGORA_COORDINATOR_URL=http://coordinator:8765
       - AGORA_AGENT_ID=test-agent-1
+      - AGORA_LOG_LEVEL=warning
 
 volumes:
   agora-data:

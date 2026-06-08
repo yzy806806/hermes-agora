@@ -1,9 +1,10 @@
-"""Tests for the plugin __init__.py — tool wrappers and register()."""
+"""Tests for the plugin __init__.py — tool wrappers, hooks, and register()."""
 
 import asyncio
 import importlib
 import sys
 import types
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -12,7 +13,7 @@ def _load_plugin():
     """Load the root __init__.py as a module."""
     name = "hermes_agora_plugin"
     if name in sys.modules:
-        return sys.modules[name]
+        del sys.modules[name]
     spec = importlib.util.spec_from_file_location(
         name, "/root/hermes-agora/__init__.py",
         submodule_search_locations=[],
@@ -26,11 +27,11 @@ def _load_plugin():
 class MockCtx:
     """Mock Hermes plugin context for testing register()."""
 
-    def __init__(self):
+    def __init__(self, config=None):
         self.tools: dict = {}
         self.hooks: dict = {}
         self.commands: dict = {}
-        self.config: dict = {}
+        self.config: dict = config if config is not None else {}
 
     def register_tool(self, name: str, func) -> None:
         self.tools[name] = func
@@ -88,3 +89,91 @@ class TestRegister:
         plugin._client = None
         with pytest.raises(RuntimeError, match="not registered"):
             asyncio.run(plugin.agora_create_motion(title="test"))
+
+
+class TestConfigCompat:
+    """Config reading: nested 'agora' key via load_config."""
+
+    def test_nested_agora_key(self):
+        plugin = _load_plugin()
+        ctx = MockCtx(config={"agora": {"coordinator_url": "http://test:9999"}})
+        plugin.register(ctx)
+        assert plugin._client._config.coordinator_url == "http://test:9999"
+
+    def test_empty_config_uses_defaults(self):
+        plugin = _load_plugin()
+        ctx = MockCtx(config={})
+        plugin.register(ctx)
+        assert plugin._client._config.coordinator_url == "http://localhost:8765"
+
+    def test_non_dict_config_uses_defaults(self):
+        plugin = _load_plugin()
+        ctx = MockCtx(config="not-a-dict")
+        plugin.register(ctx)
+        assert plugin._client._config.coordinator_url == "http://localhost:8765"
+
+
+class TestOnSessionStart:
+    """on_session_start calls client.register()."""
+
+    def test_calls_register(self):
+        plugin = _load_plugin()
+        ctx = MockCtx()
+        plugin.register(ctx)
+        mock_client = MagicMock()
+        mock_client.register = AsyncMock(return_value={"status": "ok"})
+        plugin._client = mock_client
+        asyncio.run(plugin.on_session_start(ctx))
+        mock_client.register.assert_awaited_once()
+
+    def test_handles_register_failure(self):
+        plugin = _load_plugin()
+        ctx = MockCtx()
+        plugin.register(ctx)
+        mock_client = MagicMock()
+        mock_client.register = AsyncMock(side_effect=ConnectionError("refused"))
+        plugin._client = mock_client
+        # Should not raise
+        asyncio.run(plugin.on_session_start(ctx))
+
+
+class TestOnSessionEnd:
+    """on_session_end calls client.unregister()."""
+
+    def test_calls_unregister(self):
+        plugin = _load_plugin()
+        ctx = MockCtx()
+        plugin.register(ctx)
+        mock_client = MagicMock()
+        mock_client.unregister = AsyncMock(return_value={"status": "ok"})
+        plugin._client = mock_client
+        asyncio.run(plugin.on_session_end(ctx))
+        mock_client.unregister.assert_awaited_once()
+
+    def test_handles_unregister_failure(self):
+        plugin = _load_plugin()
+        ctx = MockCtx()
+        plugin.register(ctx)
+        mock_client = MagicMock()
+        mock_client.unregister = AsyncMock(side_effect=ConnectionError("refused"))
+        plugin._client = mock_client
+        # Should not raise
+        asyncio.run(plugin.on_session_end(ctx))
+
+
+class TestPostToolCall:
+    """post_tool_call skips agora_ tools, records others."""
+
+    def test_skips_agora_tools(self):
+        plugin = _load_plugin()
+        ctx = MockCtx()
+        plugin.register(ctx)
+        # Should return early without error
+        asyncio.run(plugin.post_tool_call(ctx, "agora_speak", {}, {}))
+
+    def test_records_non_agora_tools(self):
+        plugin = _load_plugin()
+        ctx = MockCtx()
+        plugin.register(ctx)
+        # Should not raise, just logs
+        asyncio.run(plugin.post_tool_call(ctx, "web_search", {"q": "test"}, {}))

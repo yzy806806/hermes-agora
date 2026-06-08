@@ -32,7 +32,17 @@ async def register_agent(
         [agent_id, name, hermes_endpoint, model, caps_json, role, now],
     )
     await db.commit()
-    return {"agent_id": agent_id, "registered_at": now}
+    return {
+        "agent_id": agent_id,
+        "name": name,
+        "hermes_endpoint": hermes_endpoint,
+        "model": model,
+        "capabilities": capabilities or [],
+        "role": role,
+        "registered_at": now,
+        "is_online": True,
+        "last_seen": None,
+    }
 
 
 async def get_agent(

@@ -101,17 +101,33 @@ async def agora_get_result(motion_id: str) -> dict:
 
 async def on_session_start(ctx) -> None:
     """Hook: Agent上线时向Coordinator注册。"""
-    logger.info("Agora: Agent session starting")
+    client = _get_client()
+    try:
+        result = await client.register()
+        logger.info("Agora: registered with Coordinator: %s", result)
+    except Exception as exc:
+        logger.warning(
+            "Agora: registration failed (Coordinator may not be running): %s", exc
+        )
 
 
 async def on_session_end(ctx) -> None:
-    """Hook: 讨论经验写入memory。"""
-    logger.info("Agora: Agent session ending")
+    """Hook: Agent下线时从Coordinator注销。"""
+    client = _get_client()
+    try:
+        await client.unregister()
+    except Exception as exc:
+        logger.debug("Agora: unregistration failed: %s", exc)
+    logger.info("Agora: unregistered from Coordinator")
 
 
-async def post_tool_call(ctx, tool_name: str, tool_input: dict, tool_output: dict) -> None:
+async def post_tool_call(
+    ctx, tool_name: str, tool_input: dict, tool_output: dict
+) -> None:
     """Hook: 记录讨论中的工具使用作为证据。"""
-    pass
+    if tool_name.startswith("agora_"):
+        return  # Don't record our own tools
+    logger.debug("Agora: recording tool call %s as discussion evidence", tool_name)
 
 
 # -----------------------------------------------------------------------
@@ -124,10 +140,8 @@ def register(ctx) -> None:
     global _client
     logger.info("Registering Hermes Agora plugin")
 
-    # Load config from Hermes context if available
-    hermes_cfg = {}
-    if hasattr(ctx, "config"):
-        hermes_cfg = ctx.config if isinstance(ctx.config, dict) else {}
+    # Read config from Hermes context — load_config handles "agora" nesting
+    hermes_cfg = ctx.config if isinstance(ctx.config, dict) else {}
     config = load_config(hermes_cfg)
     _client = AgoraClient(config)
 

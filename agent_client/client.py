@@ -139,6 +139,28 @@ class AgoraClient:
 
     # -- Lifecycle -----------------------------------------------------------
 
+    async def register(self) -> dict[str, Any]:
+        """Register this agent with the Coordinator via HTTP POST."""
+        body = {
+            "agent_id": self._config.agent_id,
+            "name": self._config.agent_name,
+            "model": "hermes-agent",
+        }
+        return await self._post("/api/v1/agents/register", json=body)
+
+    async def unregister(self) -> dict[str, Any]:
+        """Deregister this agent from the Coordinator via HTTP DELETE."""
+        path = f"/api/v1/agents/{self._config.agent_id}"
+        try:
+            resp = await self._http.delete(path)
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as exc:
+            detail = exc.response.json().get("detail", str(exc))
+            return self._error("COORDINATOR_ERROR", detail)
+        except httpx.RequestError as exc:
+            return self._error("CONNECTION_FAILED", str(exc))
+
     async def close(self) -> None:
         await self._ws.close()
         await self._http.aclose()

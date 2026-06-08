@@ -1,0 +1,31 @@
+# Agora Production Deployment
+#
+# Usage:
+#   Start:    docker compose -f docker-compose.prod.yaml up -d
+#   Stop:     docker compose -f docker-compose.prod.yaml down
+#   Logs:     docker compose -f docker-compose.prod.yaml logs -f
+#   Cleanup:  docker compose -f docker-compose.prod.yaml down -v
+
+services:
+  coordinator:
+    build:
+      context: .
+      target: coordinator
+    ports:
+      - "8765:8765"
+    environment:
+      - AGORA_HOST=0.0.0.0
+      - AGORA_PORT=8765
+      - AGORA_DB_PATH=/data/agora.db
+      - AGORA_LOG_LEVEL=info
+    volumes:
+      - agora-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  agora-data:
