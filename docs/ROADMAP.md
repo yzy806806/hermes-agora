@@ -1,74 +1,74 @@
-# Hermes Agora 开发计划
+# Agora Development Roadmap — Owner's Vision
 
-## Phase 1: 最小可用（MVP） ✅
+> 这是项目所有者的开发构思，供 planner 和团队参考规划下一阶段。
 
-目标：能跑通一轮完整的讨论流程
+## 核心方向转变
 
-- [x] 项目骨架：plugin.yaml + __init__.py + register(ctx)
-- [x] Coordinator FastAPI 服务（HTTP + WebSocket）
-- [x] SQLite 存储层（motions、messages、votes）
-- [x] 6 个基础工具（create_motion、speak、vote、list、history、result）
-- [x] /agora 斜杠命令
-- [x] Agent 注册/注销
-- [x] 单轮讨论 + 简单多数投票
+Agora 不再是 Hermes 插件，而是一个**独立的多代理协作平台**。
 
-## Phase 2: 智能讨论 ✅
+### 1. 平台化
 
-目标：讨论质量提升，不只是机械轮次
+Agora 是一个独立平台，可以用 Docker 部署也可以本地跑。可以接入各种 agent，Hermes 是其中之一但不是唯一。
 
-- [x] Coordinator 智能判断讨论是否充分（不再固定N轮）
-  - 达成共识 → 提前投票
-  - 分歧大 → 继续讨论
-  - 跑偏 → 拉回正题
-- [x] 魔鬼代言人机制（强制引入反对意见）
-- [x] 分歧点聚焦（只继续讨论未达成共识的点）
-- [x] 多种投票方式：simple_majority / supermajority / unanimous / weighted
-- [x] 非二元选择（A方案/B方案/C方案、优先级排序）
+- Agent 注册机制：任何能通过 HTTP/WebSocket 通信的 agent 都能接入
+- 不依赖 Hermes 的 kanban、memory、skills 等内部机制
+- Coordinator 自身负责调度、存储、讨论管理
 
-## Phase 3: 记忆与进化 ✅
+### 2. 全自动项目开发
 
-目标：讨论越多越聪明
+Agora 可以设定终极目标：全自动维护开发某个项目。为此，在讨论的基础上，需要能够调度多代理并行干活。
 
-- [x] 讨论结论自动写入 Hermes memory
-- [x] Coordinator 记住历史决策模式
-- [x] Participant 记住自己的判断正确率
-- [x] Curator 优化讨论策略
-- [x] 相似议题自动引用历史结论（不重复讨论）
+完整流程：
+```
+用户扔设想 → 讨论设计 → 任务分解 → 并行开发 → 代码审查 → 发布
+```
 
-## Phase 4: 自举 ✅
+- Coordinator 从讨论结果自动生成任务图
+- 多个 agent 可以并行执行不同任务
+- 类似当前的小团队（planner/dev-merger/reviewer/releaser），但完全自动化
 
-目标：用 Agora 开发 Agora
+### 3. 代理 API 限速
 
-- [x] AI 团队通过 Agora 讨论开发方向
-- [x] 用户拍板 + AI 团队方案论证
-- [x] 开发计划由讨论结果驱动
-- [x] 项目自组织、自进化
-- [x] Trigger 系统（schedule/event/manual）
-- [x] Discussion Driver - 从开发需求触发讨论
-- [x] Task Generator - 从讨论结论生成任务
-- [x] Approval Flow - 用户审批工作流
+每个接入的代理可以设定模型 API 调用速度限制（TPM），避免资源浪费和费用失控。
 
-## Phase 5: 容错与安全 ✅
+### 4. Web Dashboard
 
-目标：系统稳定性和安全性
+需要一个 Web 界面，用于：
+- 观测项目进展
+- 查看代理们的讨论记录（实时 + 历史）
+- 项目开发进度（任务看板）
+- 各种设置页面（角色配置、项目目标、限速策略等）
 
-- [x] 心跳机制（Heartbeat）- Agent 连接监控 PING/PONG
-- [x] 超时处理（Timeout）- 讨论超时处理
-- [x] 死锁预防（Deadlock Prevention）- 循环依赖检测
-- [x] 输入验证（Input Validation）- 输入清理和速率限制
-- [x] HeartbeatManager 和 TimeoutManager 集成
-- [x] TimeoutConfig 配置项添加
-- [x] WebSocket 死锁检测钩子
-- [x] 代码质量提升：24个 datetime.utcnow() 修复，16个函数添加文档字符串
-- [x] 测试覆盖率：77% → 81%
+### 5. 项目目标灵活
 
-## 待讨论的设计问题
+Agora 管理的"项目"不限于 GitHub 仓库：
+- GitHub 仓库（自动 PR、review、release）
+- 本地目录（直接操作文件系统）
+- 本地网站（静态站生成 + 部署）
+- 任意文件集合
 
-1. **讨论质量保证**：如何确保讨论不流于形式？魔鬼代言人角色如何实现？
-2. **效率优化**：达成共识的点跳过，只讨论分歧点？动态轮次？
-3. **记忆检索**：相似议题的判定标准？历史结论的引用方式？
-4. **讨论终止条件**：谁来判断"讨论够了"？Coordinator？用户？
-5. **投票设计**：非二元选择怎么做？加权投票的权重怎么定？
-6. **多模型差异利用**：不同模型天然有不同观点，如何最大化利用？
-7. **容错机制**：某个 Agent 掉线怎么办？讨论超时怎么办？
-8. **安全性**：防止某个 Agent 垄断讨论？防止合谋？
+## 下一阶段优先级建议
+
+1. **独立化改造** — 从 Hermes 插件解耦，变成独立服务
+2. **任务执行引擎** — 讨论结果 → 任务图 → 自动分配 → 执行 → 验收
+3. **Agent 注册协议** — 定义 agent 注册、心跳、能力声明
+4. **Web Dashboard** — 讨论记录、项目进度、设置界面
+5. **Docker 化 agent** — 容器化的 agent 模板，一键部署
+
+## 参考：当前团队结构
+
+目前的子代理团队可以作为 Agora 的第一个真实测试案例：
+
+| 角色 | 当前实现 | 目标 |
+|------|---------|------|
+| maintainer | Hermes profile + cron | Agora 注册 agent |
+| planner | Hermes profile + cron | Agora 注册 agent |
+| dev-merger | Hermes profile + cron | Docker 容器 agent |
+| reviewer | Hermes profile + cron | Docker 容器 agent |
+| releaser | Hermes profile + cron | Docker 容器 agent |
+
+## 参考：未来用例
+
+**DocMind** — 一个文档知识库项目，只有初步设想，等 Agora 成熟后扔给 Agora 全自动开发。
+
+这就是 Agora 的价值：用户只需要一个想法，Agora 组织团队把想法变成现实。
