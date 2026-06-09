@@ -1,6 +1,6 @@
 """SQL schema definitions for the Agora Coordinator database."""
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 SCHEMA_SQL = """\
 PRAGMA foreign_keys = ON;
@@ -154,4 +154,19 @@ CREATE INDEX IF NOT EXISTS idx_bootstrap_triggers_status ON bootstrap_triggers(s
 CREATE INDEX IF NOT EXISTS idx_bootstrap_schedules_enabled ON bootstrap_schedules(enabled);
 CREATE INDEX IF NOT EXISTS idx_bootstrap_approvals_motion ON bootstrap_approvals(motion_id);
 CREATE INDEX IF NOT EXISTS idx_bootstrap_approvals_status ON bootstrap_approvals(approval_status);
+
+-- Phase 8: Dashboard event log
+
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    detail TEXT,
+    motion_id TEXT,
+    agent_id TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
+CREATE INDEX IF NOT EXISTS idx_events_motion ON events(motion_id);
+CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
 """

@@ -314,3 +314,29 @@ class AssessmentResponse(BaseModel):
     metrics: dict[str, Any] = Field(default_factory=dict)
     rationale: str = ""
     recommendations: list[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Phase 8: Dashboard / Event models
+# ---------------------------------------------------------------------------
+
+
+class EventResponse(BaseModel):
+    """A single event from the event log."""
+
+    event_id: int
+    type: str
+    detail: str = ""
+    motion_id: Optional[str] = None
+    agent_id: Optional[str] = None
+    created_at: str = ""
+
+
+class TimelineEntry(BaseModel):
+    """A single entry in a discussion timeline."""
+
+    time: str
+    type: str
+    agent_id: Optional[str] = None
+    content: str = ""
+    round_num: Optional[int] = None

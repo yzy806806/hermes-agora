@@ -10,6 +10,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
 
 from .models import (
     AgentInfo,
@@ -27,6 +28,8 @@ from .state import InvalidTransitionError, StateMachine
 from .storage import Storage
 from .ws import manager
 from .curator import DiscussionCurator
+from .observability.metrics import collect_metrics
+from .observability.trace import get_trace_id, set_trace_id
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +60,18 @@ def _get_sm() -> StateMachine:
     if _state_machine is None:
         raise HTTPException(status_code=503, detail="Service not initialized")
     return _state_machine
+
+
+# ---------------------------------------------------------------------------
+# Observability API
+# ---------------------------------------------------------------------------
+
+
+@router.get("/metrics")
+async def metrics_endpoint() -> Response:
+    """Prometheus-format metrics endpoint."""
+    body, content_type = collect_metrics()
+    return Response(content=body, media_type=content_type)
 
 
 # ---------------------------------------------------------------------------

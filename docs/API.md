@@ -1,6 +1,6 @@
 # Hermes Agora API 参考
 
-> 版本: v0.7.0 | 基础路径: `/api/v1`
+> 版本: v0.8.0 | 基础路径: `/api/v1`
 
 ## REST API
 
@@ -520,3 +520,135 @@ ws://host:8765/ws/{agent_id}
 | `not_found` | 议题不存在 |
 | `invalid_vote_format` | 投票格式与投票方式不匹配 |
 | `not_registered` | Agent 未注册 |
+
+---
+
+## Phase 8: 可观测性端点
+
+### GET /metrics
+
+Prometheus 格式指标暴露。
+
+**响应**: `text/plain` — OpenMetrics/Prometheus 文本格式
+
+---
+
+### GET /events
+
+获取事件历史。
+
+**查询参数**:
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `since` | string | null | ISO 时间戳，返回此时间后的事件 |
+| `type` | string | null | 过滤事件类型 |
+| `limit` | int | 100 | 返回数量上限 |
+
+**响应**: `EventResponse[]` 数组
+
+---
+
+### GET /events/stream
+
+SSE 实时事件流。
+
+**查询参数**:
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `tenant_id` | string | null | 过滤租户 |
+
+**响应**: `text/event-stream` — SSE 格式
+
+---
+
+### GET /discussions/{motion_id}/timeline
+
+获取讨论时间线（发言 + 投票按时间排序）。
+
+**响应**: `TimelineEntry[]` 数组
+
+---
+
+## Phase 8: 多租户端点
+
+### POST /tenants
+
+创建租户。
+
+**请求体**:
+```json
+{
+  "tenant_id": "team-alpha",
+  "name": "Alpha Team",
+  "config": {
+    "max_agents": 10,
+    "max_concurrent_discussions": 3
+  }
+}
+```
+
+**响应**: `Tenant` 对象
+
+**状态码**:
+- `200` — 创建成功
+- `409` — 租户已存在
+
+---
+
+### GET /tenants
+
+列出所有租户。
+
+**响应**: `Tenant[]` 数组
+
+---
+
+### GET /tenants/{tenant_id}
+
+获取租户详情。
+
+**响应**: `Tenant` 对象
+
+**状态码**:
+- `200` — 成功
+- `404` — 租户不存在
+
+---
+
+### DELETE /tenants/{tenant_id}
+
+删除租户（软删除）。
+
+**状态码**:
+- `200` — 删除成功
+- `404` — 租户不存在
+- `403` — 不能删除 default 租户
+
+---
+
+## Phase 8: Dashboard
+
+### GET /dashboard
+
+Dashboard HTML 页面。
+
+**响应**: `text/html`
+
+---
+
+### GET /static/{file}
+
+Dashboard 静态资源。
+
+---
+
+## Phase 8: WebSocket 多租户
+
+WebSocket 连接支持 `tenant_id` 参数实现租户隔离：
+
+```
+ws://host:8765/ws/{agent_id}?tenant_id=team-alpha
+```
+
+不带 `tenant_id` 时默认使用 `"default"` 租户（向后兼容）。
+同一租户的 Agent 只能看到同租户的消息和事件。

@@ -17,6 +17,7 @@ from . import agents as _agents
 from . import assessments as _assessments
 from . import bootstrap as _bootstrap
 from . import bootstrap_approval as _bootstrap_approval
+from . import events as _events
 from . import judgments as _judgments
 from . import messages as _messages
 from . import motions as _motions
@@ -303,3 +304,27 @@ class Storage:
         async with self._connection() as db:
             return await _bootstrap_approval.list_bootstrap_agents(
                 db, active_only)
+
+    # --- Event CRUD (Phase 8 Dashboard) ---
+
+    async def log_event(
+        self, event_type: str, detail: str = "",
+        motion_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+    ) -> int:
+        async with self._connection() as db:
+            return await _events.log_event(
+                db, event_type, detail, motion_id, agent_id)
+
+    async def get_events(
+        self, since: Optional[str] = None,
+        event_type: Optional[str] = None,
+        limit: int = 100,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _events.get_events(
+                db, since, event_type, limit)
+
+    async def get_timeline(self, motion_id: str) -> list[dict]:
+        async with self._connection() as db:
+            return await _events.get_timeline(db, motion_id)

@@ -1,7 +1,8 @@
 """WebSocket connection manager for the Agora Coordinator service.
 
-Provides ConnectionManager for connection lifecycle management.
-Endpoint and handlers live in ws_endpoint.py and ws_handlers.py.
+Phase 8.2: Per-tenant ConnectionHub isolation.
+Each tenant has its own ConnectionHub, so agents only see messages
+from agents in the same tenant.
 """
 
 from __future__ import annotations
@@ -18,8 +19,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ConnectionManager:
-    """Manages active WebSocket connections by agent_id."""
+class ConnectionHub:
+    """Manages WebSocket connections for a single tenant."""
 
     def __init__(self) -> None:
         self.active_connections: dict[str, WebSocket] = {}
@@ -27,7 +28,6 @@ class ConnectionManager:
         self._state_machine: Optional[StateMachine] = None
 
     def set_deps(self, storage: Storage, sm: StateMachine) -> None:
-        """Inject storage and state machine dependencies."""
         self._storage = storage
         self._state_machine = sm
 
@@ -47,12 +47,10 @@ class ConnectionManager:
         return True
 
     def disconnect(self, agent_id: str) -> None:
-        """Remove a WebSocket connection."""
         self.active_connections.pop(agent_id, None)
         logger.info("Agent %s disconnected from WebSocket", agent_id)
 
     async def send(self, agent_id: str, message: dict[str, Any]) -> bool:
-        """Send a JSON message to a specific agent."""
         ws = self.active_connections.get(agent_id)
         if ws is None:
             return False
@@ -66,7 +64,6 @@ class ConnectionManager:
     async def broadcast(
         self, message: dict[str, Any], exclude: list[str] | None = None
     ) -> int:
-        """Broadcast a JSON message to all connected agents."""
         exclude_set = set(exclude or [])
         count = 0
         for aid, ws in list(self.active_connections.items()):
@@ -83,6 +80,68 @@ class ConnectionManager:
 
     def get_online_agents(self) -> list[str]:
         return list(self.active_connections.keys())
+
+
+class ConnectionManager:
+    """Multi-tenant WebSocket connection manager.
+
+    Manages per-tenant ConnectionHub instances.
+    """
+
+    def __init__(self) -> None:
+        self._hubs: dict[str, ConnectionHub] = {}
+        self._default_hub = ConnectionHub()
+
+    def get_hub(self, tenant_id: str) -> ConnectionHub:
+        """Get or create a ConnectionHub for a tenant."""
+        if tenant_id == "default":
+            return self._default_hub
+        if tenant_id not in self._hubs:
+            self._hubs[tenant_id] = ConnectionHub()
+        return self._hubs[tenant_id]
+
+    def set_deps(self, storage: Storage, sm: StateMachine) -> None:
+        """Set deps on the default hub (backward compat)."""
+        self._default_hub.set_deps(storage, sm)
+
+    def set_tenant_deps(self, tenant_id: str, storage: Storage,
+                        sm: StateMachine) -> None:
+        """Set deps on a specific tenant's hub."""
+        hub = self.get_hub(tenant_id)
+        hub.set_deps(storage, sm)
+
+    # Backward-compat proxies to default hub
+    @property
+    def active_connections(self) -> dict[str, WebSocket]:
+        return self._default_hub.active_connections
+
+    @property
+    def _storage(self) -> Optional[Storage]:
+        return self._default_hub._storage
+
+    @property
+    def _state_machine(self) -> Optional[StateMachine]:
+        return self._default_hub._state_machine
+
+    async def connect(self, agent_id: str, websocket: WebSocket) -> bool:
+        return await self._default_hub.connect(agent_id, websocket)
+
+    def disconnect(self, agent_id: str) -> None:
+        self._default_hub.disconnect(agent_id)
+
+    async def send(self, agent_id: str, message: dict[str, Any]) -> bool:
+        return await self._default_hub.send(agent_id, message)
+
+    async def broadcast(
+        self, message: dict[str, Any], exclude: list[str] | None = None
+    ) -> int:
+        return await self._default_hub.broadcast(message, exclude)
+
+    def is_connected(self, agent_id: str) -> bool:
+        return self._default_hub.is_connected(agent_id)
+
+    def get_online_agents(self) -> list[str]:
+        return self._default_hub.get_online_agents()
 
 
 # Module-level singleton

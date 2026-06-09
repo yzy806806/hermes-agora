@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.8.0 (2026-06-09)
+
+### Added
+- **Observability (Phase 8.1)**: Metrics, events, and traces infrastructure
+  - `coordinator/observability/`: Prometheus metrics exporter, structured event logging, OpenTelemetry-compatible trace context propagation
+  - `coordinator/storage/events.py`: Event persistence layer
+  - `coordinator/storage/global_store.py`: Cross-tenant shared state store
+  - `coordinator/storage/storage_manager.py`: Multi-backend storage orchestration
+
+- **Multi-tenant Infrastructure (Phase 8.2)**: Tenant isolation and management
+  - `coordinator/tenant/`: Tenant models, guard (quota/enforcement), manager (lifecycle), router (API endpoints)
+  - Lazy tenant initialization via WebSocket path routing
+
+- **Dashboard Frontend (Phase 8.3)**: Real-time monitoring UI
+  - `coordinator/dashboard.py`: Dashboard API endpoints (metrics, tenant status, agent health)
+  - `coordinator/static/dashboard.html`: Single-page monitoring dashboard
+  - `coordinator/static/dashboard.js`: Real-time dashboard updates via WebSocket
+
+- **Integration & Testing (Phase 8.4)**: End-to-end validation
+  - `tests/test_observability.py`: Observability pipeline tests
+  - `tests/test_multi_tenant.py`: Tenant isolation and lifecycle tests
+  - `tests/test_dashboard.py`: Dashboard API and UI tests
+  - `tests/test_phase8_integration.py`: Full Phase 8 integration tests
+  - `tests/test_ws_tenant_lazy_init.py`: Tenant lazy-init WebSocket tests
+  - `docs/DESIGN-phase8.md`: Phase 8 design document
+
+- **Documentation**: Updated API.md, ARCHITECTURE.md, INSPECTION-LOG.md, ROADMAP.md
+
+### Changed
+- Rebranded to Agora: independent multi-agent platform
+- `coordinator/main.py`: Integrated observability, tenant, and dashboard subsystems
+- `coordinator/models.py`: Extended models with tenant/observability fields
+- `coordinator/router.py`: New observability, tenant, and dashboard endpoints
+- `coordinator/storage/schema.py`: Extended schema for events and tenant tables
+- `coordinator/storage/storage.py`: Multi-tenant storage support
+- `coordinator/ws.py`: Tenant-aware WebSocket routing
+- `coordinator/ws_endpoint.py`: Enhanced with tenant and observability hooks
+- `README.md`: Updated feature list and architecture description
+
+### Fixed
+- Cleaned up AsyncMock garbage files from project root
+
 ## v0.7.0 (2026-06-08)
 
 ### Added

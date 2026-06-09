@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agora Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0}
+nav{background:#1e293b;padding:12px 24px;display:flex;gap:16px}
+nav a{color:#94a3b8;text-decoration:none;padding:6px 12px;border-radius:6px;cursor:pointer}
+nav a.active{background:#3b82f6;color:#fff}
+.page{display:none;padding:24px;max-width:1200px;margin:0 auto}
+.page.active{display:block}h2{margin-bottom:16px;color:#f1f5f9}
+.card{background:#1e293b;border-radius:8px;padding:16px;margin-bottom:12px}
+.card h3{color:#60a5fa;margin-bottom:8px}.stat{display:inline-block;margin-right:24px}
+.stat span{font-size:24px;font-weight:700;color:#34d399}
+table{width:100%;border-collapse:collapse}th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #334155}
+th{color:#94a3b8;font-weight:600}#timeline{max-height:500px;overflow-y:auto}
+.event{padding:8px 12px;border-left:3px solid #3b82f6;margin-bottom:4px;background:#1e293b;border-radius:0 6px 6px 0}
+.event .time{font-size:12px;color:#94a3b8}.event .detail{color:#e2e8f0}
+select,input{background:#334155;color:#e2e8f0;border:1px solid #475569;border-radius:4px;padding:6px 10px}
+</style>
+</head>
+<body>
+<nav id="nav">
+  <a class="active" data-page="overview">Overview</a>
+  <a data-page="discussions">Discussions</a>
+  <a data-page="agents">Agents</a>
+  <a data-page="metrics">Metrics</a>
+</nav>
+<div id="overview" class="page active">
+  <h2>System Overview</h2>
+  <div class="card"><div class="stat">Discussions: <span id="s-motions">0</span></div>
+  <div class="stat">Agents Online: <span id="s-agents">0</span></div></div>
+  <h3 style="margin:16px 0 8px;color:#94a3b8">Recent Events</h3>
+  <div id="event-stream"></div>
+</div>
+<div id="discussions" class="page">
+  <h2>Discussion Detail</h2>
+  <div class="card"><label>Motion: </label>
+  <select id="motion-select"><option value="">-- select --</option></select></div>
+  <div id="timeline"></div>
+  <div id="vote-summary" class="card" style="margin-top:12px"></div>
+</div>
+<div id="agents" class="page">
+  <h2>Agent List</h2>
+  <div class="card"><table id="agent-table">
+  <thead><tr><th>ID</th><th>Name</th><th>Model</th><th>Status</th><th>Last Seen</th></tr></thead>
+  <tbody></tbody></table></div>
+</div>
+<div id="metrics" class="page">
+  <h2>Prometheus Metrics</h2>
+  <div class="card"><canvas id="metrics-chart" height="300"></canvas></div>
+</div>
+<script src="/static/dashboard.js"></script>
+</body>
+</html>
