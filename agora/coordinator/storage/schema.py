@@ -1,6 +1,6 @@
 """SQL schema definitions for the Agora Coordinator database."""
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 SCHEMA_SQL = """\
 PRAGMA foreign_keys = ON;
@@ -169,4 +169,38 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
 CREATE INDEX IF NOT EXISTS idx_events_motion ON events(motion_id);
 CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
+
+-- Phase 9: Task Execution Engine
+
+CREATE TABLE IF NOT EXISTS task_graphs (
+    id TEXT PRIMARY KEY,
+    motion_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (motion_id) REFERENCES motions(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS tasks (
+    id TEXT PRIMARY KEY,
+    graph_id TEXT NOT NULL,
+    motion_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending',
+    assigned_to TEXT,
+    required_capabilities TEXT,
+    depends_on TEXT,
+    artifact_paths TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    started_at TEXT,
+    completed_at TEXT,
+    FOREIGN KEY (graph_id) REFERENCES task_graphs(id) ON DELETE CASCADE,
+    FOREIGN KEY (motion_id) REFERENCES motions(id) ON DELETE CASCADE,
+    FOREIGN KEY (assigned_to) REFERENCES agents(agent_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_graph ON tasks(graph_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_motion ON tasks(motion_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to);
 """

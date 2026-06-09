@@ -21,6 +21,7 @@ from . import events as _events
 from . import judgments as _judgments
 from . import messages as _messages
 from . import motions as _motions
+from . import tasks as _tasks
 from . import votes as _votes
 from .schema import SCHEMA_SQL, SCHEMA_VERSION
 
@@ -328,3 +329,47 @@ class Storage:
     async def get_timeline(self, motion_id: str) -> list[dict]:
         async with self._connection() as db:
             return await _events.get_timeline(db, motion_id)
+
+    # --- Task CRUD (Phase 9) ---
+
+    async def create_task_graph(
+        self, graph_id: str, motion_id: str
+    ) -> dict:
+        async with self._connection() as db:
+            return await _tasks.create_task_graph(db, graph_id, motion_id)
+
+    async def get_task_graph(self, graph_id: str) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _tasks.get_task_graph(db, graph_id)
+
+    async def get_task_graph_by_motion(
+        self, motion_id: str
+    ) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _tasks.get_task_graph_by_motion(db, motion_id)
+
+    async def create_task(self, task) -> dict:
+        async with self._connection() as db:
+            return await _tasks.create_task(db, task)
+
+    async def get_task(self, task_id: str) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _tasks.get_task(db, task_id)
+
+    async def list_tasks(self, **kwargs) -> list[dict]:
+        async with self._connection() as db:
+            return await _tasks.list_tasks(db, **kwargs)
+
+    async def update_task_status(
+        self, task_id: str, status: str, **kwargs
+    ) -> None:
+        async with self._connection() as db:
+            await _tasks.update_task_status(
+                db, task_id, status, **kwargs)
+
+    async def get_agent_task_count(
+        self, agent_id: str, active_only: bool = True
+    ) -> int:
+        async with self._connection() as db:
+            return await _tasks.get_agent_task_count(
+                db, agent_id, active_only)
