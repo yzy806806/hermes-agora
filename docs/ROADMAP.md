@@ -56,11 +56,34 @@ Agora 管理的"项目"不限于 GitHub 仓库：
 
 ## 下一阶段优先级建议
 
-1. **独立化改造** — 从 Hermes 插件解耦，变成独立服务
-2. **任务执行引擎** — 讨论结果 → 任务图 → 自动分配 → 执行 → 验收
-3. **Agent 注册协议** — 定义 agent 注册、心跳、能力声明
-4. **Web Dashboard** — 讨论记录、项目进度、设置界面
-5. **Docker 化 agent** — 容器化的 agent 模板，一键部署
+1. **独立化改造** — 从 Hermes 插件解耦，变成独立服务 ✅ Phase 9.1 已完成
+2. **任务执行引擎** — 讨论结果 → 任务图 → 自动分配 → 执行 → 验收（Phase 9.2 设计完成，待开发）
+3. **Agent 注册协议** — 定义 agent 注册、心跳、能力声明（Phase 9.3 待开发）
+4. **API 速率限制** — TPM 限速（Phase 9.4 待开发）
+5. **Web Dashboard** — 讨论记录、项目进度、设置界面（Phase 11+）
+
+## Agent 接入策略（2026-06-09 决策）
+
+**不自己开发 Agent Runtime。** Agora 只做 Coordinator（讨论 + 调度），agent 全部用现成的。
+
+原因：
+- Hermes、OpenClaw 等各有专门团队维护，我们维护不了另一个 agent 框架
+- Agora 的核心价值是"多 agent 协作调度"，不是"又一个 agent 框架"
+- 通过标准协议接入，任何实现了协议的 agent 都能加入讨论和执行任务
+
+Agora 定义标准通信协议（WebSocket + JSON），agent 侧只需实现一个薄适配层。
+
+候选接入的 agent 平台（由 planner 调研确定优先级和可行性）：
+- **Hermes** — 有 TUI + CLI，skill/memory/tool 机制成熟，当前团队已在使用
+- **OpenClaw** — CLI 驱动，需调研接入方式
+- **PicoClaw** — 待调研
+- 其他热门 agent CLI 工具
+
+当前团队迁移路径：
+- 5 个 Hermes profile（maintainer/planner/dev-merger/reviewer/releaser）保留
+- 触发方式从 kanban dispatcher 换成 Agora coordinator WebSocket 消息
+- skill/memory/tool 全部保留，agent 还是 Hermes
+- coordinator 角色（讨论主持 + 任务分发）由 Agora 内置实现，或由 Hermes profile 担任
 
 ## 参考：当前团队结构
 
@@ -74,8 +97,36 @@ Agora 管理的"项目"不限于 GitHub 仓库：
 | reviewer | Hermes profile + cron | Docker 容器 agent |
 | releaser | Hermes profile + cron | Docker 容器 agent |
 
+## Phase 9: 平台独立 + 任务执行引擎 + Agent 注册协议 (2026-06)
+
+> 详细设计见 docs/DESIGN-phase9.md
+
+### 目标
+
+1. **平台独立化** — 从 Hermes 插件解耦为独立 pip 包 `agora`，支持 Docker 部署
+2. **任务执行引擎** — 讨论结果自动生成任务图 → 分配 → 执行 → 验收
+3. **Agent 注册协议** — 标准化注册、心跳、能力声明、Token 认证
+4. **API 速率限制** — 每 Agent TPM 限制，客户端本地执行
+
+### 不做什么
+
+- 不做并行任务执行（Phase 10）
+- 不做完整 RBAC（Phase 10+）
+- 不做插件生态（Phase 10+）
+- 不做 Web 管理界面（Phase 11+）
+
+### 子任务拆分
+
+- 9.1a-c: 平台独立（包重命名、Docker、配置）
+- 9.2a-e: 任务执行引擎（模型、生成、分配、执行、验证）
+- 9.3a-c: Agent 注册协议（模型更新、注册认证、心跳能力）
+- 9.4a-b: API 速率限制（令牌桶、客户端集成）
+- 9.5a: 集成 + 文档更新
+
 ## 参考：未来用例
 
 **DocMind** — 一个文档知识库项目，只有初步设想，等 Agora 成熟后扔给 Agora 全自动开发。
 
 这就是 Agora 的价值：用户只需要一个想法，Agora 组织团队把想法变成现实。
+
+## 状态：已纳入开发计划（由 planner 于 2026-06-09 确认）
