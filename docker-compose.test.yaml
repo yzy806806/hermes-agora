@@ -21,7 +21,8 @@ services:
     volumes:
       - agora-data:/app/data
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"]
+      test: ["CMD", "python", "-c",
+        "import urllib.request; urllib.request.urlopen('http://localhost:8765/api/v1/health')"]
       interval: 3s
       timeout: 5s
       retries: 10

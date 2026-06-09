@@ -13,11 +13,11 @@ import pytest_asyncio
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from coordinator.bootstrap import BootstrapConfig, BootstrapEngine
-from coordinator.bootstrap.approval_flow import ApprovalFlow
-from coordinator.bootstrap.discussion_driver import DiscussionResult
-from coordinator.bootstrap.trigger_manager import TriggerManager
-from coordinator.storage.schema import SCHEMA_SQL
+from agora.coordinator.bootstrap import BootstrapConfig, BootstrapEngine
+from agora.coordinator.bootstrap.approval_flow import ApprovalFlow
+from agora.coordinator.bootstrap.discussion_driver import DiscussionResult
+from agora.coordinator.bootstrap.trigger_manager import TriggerManager
+from agora.coordinator.storage.schema import SCHEMA_SQL
 
 
 @pytest.fixture(scope="module")
@@ -61,7 +61,7 @@ class TestBootstrapEngine:
     @pytest.mark.asyncio
     async def test_init_routes(self, engine):
         # init_routes was called in fixture, should not error
-        from coordinator.bootstrap import routes as r
+        from agora.coordinator.bootstrap import routes as r
         assert r._trigger_mgr is not None
         assert r._approval_flow is not None
         assert r._db_path is not None
@@ -88,7 +88,7 @@ class TestBootstrapEngine:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("coordinator.bootstrap.task_generator.aiohttp.ClientSession",
+        with patch("agora.coordinator.bootstrap.task_generator.aiohttp.ClientSession",
                     return_value=mock_session):
             result = await engine.process_approval(
                 aid, approved=True, approved_by="alice",

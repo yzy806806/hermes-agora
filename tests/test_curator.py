@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from coordinator.curator import DiscussionCurator
+from agora.coordinator.curator import DiscussionCurator
 
 
 @pytest.fixture

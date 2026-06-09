@@ -63,7 +63,7 @@ async def coordinator_port() -> AsyncGenerator[int, None]:
         "AGORA_LOG_LEVEL": "warning",
     }
     proc = await asyncio.create_subprocess_exec(
-        "uv", "run", "python", "-m", "coordinator.main",
+        "uv", "run", "python", "-m", "agora.coordinator.main",
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,

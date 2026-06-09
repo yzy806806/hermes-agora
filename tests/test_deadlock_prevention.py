@@ -1,6 +1,6 @@
 """Unit tests for coordinator/deadlock_prevention.py."""
 import pytest
-from coordinator.deadlock_prevention import DeadlockDetector, ReferenceGraph, DeadlockStatus
+from agora.coordinator.deadlock_prevention import DeadlockDetector, ReferenceGraph, DeadlockStatus
 
 
 class TestDeadlockStatus:

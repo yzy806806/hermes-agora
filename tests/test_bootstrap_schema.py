@@ -11,8 +11,8 @@ import pytest_asyncio
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from coordinator.storage.schema import SCHEMA_SQL
-from coordinator.bootstrap.schedule_checker import (
+from agora.coordinator.storage.schema import SCHEMA_SQL
+from agora.coordinator.bootstrap.schedule_checker import (
     check_scheduled_triggers,
     update_schedule_run,
 )

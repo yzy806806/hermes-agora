@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from coordinator.quality_scorer import QualityScore, QualityScorer
+from agora.coordinator.quality_scorer import QualityScore, QualityScorer
 
 
 @pytest.fixture

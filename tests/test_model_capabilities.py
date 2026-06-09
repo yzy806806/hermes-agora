@@ -1,6 +1,6 @@
 """Tests for coordinator/model_capabilities.py."""
 import pytest
-from coordinator.model_capabilities import (
+from agora.coordinator.model_capabilities import (
     ModelCapability,
     ModelProfile,
     MODEL_PROFILES,

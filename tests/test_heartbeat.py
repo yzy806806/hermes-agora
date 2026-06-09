@@ -4,7 +4,7 @@ import time
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from coordinator.heartbeat import HeartbeatManager, AgentConnectionStatus
+from agora.coordinator.heartbeat import HeartbeatManager, AgentConnectionStatus
 
 
 @pytest.fixture

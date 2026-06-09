@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.9.0 (2026-06-10)
+
+### Changed
+- **Phase 9.1 Platform Independence**: Package restructure from flat `coordinator/` to `agora/coordinator/` namespace
+- **Docker image**: Containerized deployment with multi-stage Dockerfile
+- **Config overhaul**: Unified configuration system with environment-aware settings
+- **Entry points**: New CLI entry points (`agora`, `agora-coordinator`, `agora-agent`) replacing legacy scripts
+- **Build system**: Hatchling wheel build targeting `agora` package
+
+### Removed
+- Legacy flat module files (`__init__.py`, `cmd_*.py`, `commands.py`) replaced by `agora/` package
+- Old `agent_client/` standalone module — now under `agora/agent_client/`
+
 ## v0.8.0 (2026-06-09)
 
 ### Added

@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from agent_client.config import AgoraConfig, load_config
+from agora.agent_client.config import AgoraConfig, load_config
 
 
 class TestAgoraConfig:

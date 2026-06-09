@@ -3,9 +3,9 @@
 import pytest
 import pytest_asyncio
 
-from coordinator.judgment_tracker import JudgmentTracker
-from coordinator.judgment_types import AgentScore
-from coordinator.storage.storage import Storage
+from agora.coordinator.judgment_tracker import JudgmentTracker
+from agora.coordinator.judgment_types import AgentScore
+from agora.coordinator.storage.storage import Storage
 
 
 @pytest_asyncio.fixture

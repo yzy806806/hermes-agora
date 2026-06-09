@@ -1,8 +1,8 @@
 """Tests for ConsensusJumpManager — sub-topic consensus analysis."""
 import pytest
 
-from coordinator.consensus_jump import ConsensusJumpManager, SubTopicConsensus
-from coordinator.storage import Storage
+from agora.coordinator.consensus_jump import ConsensusJumpManager, SubTopicConsensus
+from agora.coordinator.storage import Storage
 
 
 async def _seed_agents(storage: Storage, count: int) -> None:

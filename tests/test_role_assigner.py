@@ -2,10 +2,10 @@
 import pytest
 from unittest.mock import AsyncMock
 
-from coordinator.model_capabilities import ModelCapability, ModelProfiler
-from coordinator.models import DiscussionRole
-from coordinator.role_assigner import ModelAwareRoleAssigner, ROLE_INSTRUCTIONS
-from coordinator.perspective_ensurer import PerspectiveEnsurer
+from agora.coordinator.model_capabilities import ModelCapability, ModelProfiler
+from agora.coordinator.models import DiscussionRole
+from agora.coordinator.role_assigner import ModelAwareRoleAssigner, ROLE_INSTRUCTIONS
+from agora.coordinator.perspective_ensurer import PerspectiveEnsurer
 
 
 def _make_agent(agent_id: str, model: str = "unknown") -> dict:

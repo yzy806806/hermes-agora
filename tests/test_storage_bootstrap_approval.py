@@ -2,7 +2,7 @@
 
 import pytest
 import pytest_asyncio
-from coordinator.storage import Storage
+from agora.coordinator.storage import Storage
 
 
 @pytest_asyncio.fixture(loop_scope="session")

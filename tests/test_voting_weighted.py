@@ -1,7 +1,7 @@
 """Tests for coordinator/voting/weighted.py."""
 
-from coordinator.voting.weighted import WeightedVoting
-from coordinator.voting.weighted_types import WeightedVoteResult
+from agora.coordinator.voting.weighted import WeightedVoting
+from agora.coordinator.voting.weighted_types import WeightedVoteResult
 
 
 class TestWeightedVoting:

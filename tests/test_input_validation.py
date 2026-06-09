@@ -1,6 +1,6 @@
 """Tests for InputValidator and ValidationConfig."""
 import pytest
-from coordinator.input_validation import InputValidator, ValidationConfig
+from agora.coordinator.input_validation import InputValidator, ValidationConfig
 
 
 class TestInputValidator:

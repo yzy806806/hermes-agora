@@ -6,12 +6,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from coordinator.devils_advocate import (
+from agora.coordinator.devils_advocate import (
     DevilsAdvocateConfig,
     DevilsAdvocateManager,
 )
-from coordinator.models import Stance
-from coordinator.quality_guard_models import QualityGuardConfig
+from agora.coordinator.models import Stance
+from agora.coordinator.quality_guard_models import QualityGuardConfig
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def mock_ws():
 
 def _make_no_alert_guard(storage):
     """Create a QualityGuard that always returns empty alerts."""
-    from coordinator.quality_guard import QualityGuard
+    from agora.coordinator.quality_guard import QualityGuard
     guard = MagicMock(spec=QualityGuard)
     guard.check_quality = AsyncMock(return_value=[])
     guard.config = QualityGuardConfig()

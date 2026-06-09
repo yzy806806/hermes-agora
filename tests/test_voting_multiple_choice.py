@@ -1,6 +1,6 @@
 """Tests for coordinator/voting/multiple_choice.py."""
 
-from coordinator.voting.multiple_choice import MultipleChoiceVote
+from agora.coordinator.voting.multiple_choice import MultipleChoiceVote
 
 
 class TestMultipleChoiceVote:

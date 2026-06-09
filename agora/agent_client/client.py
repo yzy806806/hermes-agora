@@ -164,3 +164,11 @@ class AgoraClient:
     async def close(self) -> None:
         await self._ws.close()
         await self._http.aclose()
+
+
+def main() -> None:
+    """CLI entry point for running an agent."""
+    import asyncio
+    config = AgoraConfig()
+    client = AgoraClient(config)
+    asyncio.run(client.register())

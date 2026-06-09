@@ -4,8 +4,8 @@ from __future__ import annotations
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from coordinator.config import Settings
-from coordinator.timeout import TimeoutConfig
+from agora.coordinator.config import Settings
+from agora.coordinator.timeout import TimeoutConfig
 
 
 class TestConfigSettings:
@@ -51,17 +51,17 @@ class TestLifespanIntegration:
 
     @pytest.mark.asyncio
     async def test_lifespan_creates_managers(self):
-        from coordinator.main import lifespan
+        from agora.coordinator.main import lifespan
 
         app_mock = MagicMock()
         app_mock.state = MagicMock()
 
-        with patch("coordinator.main.Storage") as StorageMock, \
-             patch("coordinator.main.StateMachine"), \
-             patch("coordinator.main.init_deps"), \
-             patch("coordinator.main.BootstrapEngine") as BEMock, \
-             patch("coordinator.main.HeartbeatManager") as HBMok, \
-             patch("coordinator.main.TimeoutManager") as TMMok:
+        with patch("agora.coordinator.main.Storage") as StorageMock, \
+             patch("agora.coordinator.main.StateMachine"), \
+             patch("agora.coordinator.main.init_deps"), \
+             patch("agora.coordinator.main.BootstrapEngine") as BEMock, \
+             patch("agora.coordinator.main.HeartbeatManager") as HBMok, \
+             patch("agora.coordinator.main.TimeoutManager") as TMMok:
             StorageMock.return_value = AsyncMock()
             StorageMock.return_value.init_db = AsyncMock()
             BEMock.return_value.init_routes = MagicMock()

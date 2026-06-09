@@ -2,8 +2,8 @@
 
 import pytest
 
-from coordinator.models import VotingMethod
-from coordinator.voting.factory import (
+from agora.coordinator.models import VotingMethod
+from agora.coordinator.voting.factory import (
     VoteCounterFactory,
     SimpleMajorityCounter,
     SupermajorityCounter,

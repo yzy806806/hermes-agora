@@ -127,6 +127,7 @@ def create_app() -> FastAPI:
         return FileResponse(static_dir / "dashboard.html")
 
     @app.get("/health")
+    @app.get("/api/v1/health")
     async def health_check():
         return {"status": "healthy"}
 
@@ -139,7 +140,7 @@ app = create_app()
 def main() -> None:
     """Run the coordinator service via uvicorn."""
     uvicorn.run(
-        "coordinator.main:app",
+        "agora.coordinator.main:app",
         host=settings.host,
         port=settings.port,
         reload=settings.debug,

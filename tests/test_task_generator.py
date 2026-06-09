@@ -10,10 +10,10 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from coordinator.bootstrap.task_generator import (
+from agora.coordinator.bootstrap.task_generator import (
     ASSIGNEE_MAP, TaskGenerator, TaskSpec,
 )
-from coordinator.bootstrap.discussion_driver import DiscussionResult
+from agora.coordinator.bootstrap.discussion_driver import DiscussionResult
 
 
 class TestTaskSpec:
@@ -85,7 +85,7 @@ class TestTaskGenerator:
             return _mock_post_response(resp2)
 
         with patch(
-            "coordinator.bootstrap.task_generator.aiohttp.ClientSession",
+            "agora.coordinator.bootstrap.task_generator.aiohttp.ClientSession",
             side_effect=fake_client,
         ):
             ids = await self.gen.generate_tasks({
@@ -112,7 +112,7 @@ class TestTaskGenerator:
         resp.json = AsyncMock(return_value={"task_id": "t10"})
 
         with patch(
-            "coordinator.bootstrap.task_generator.aiohttp.ClientSession",
+            "agora.coordinator.bootstrap.task_generator.aiohttp.ClientSession",
             return_value=_mock_post_response(resp),
         ):
             ids = await self.gen.from_discussion_result(result)
@@ -131,7 +131,7 @@ class TestTaskGenerator:
         )
 
         with patch(
-            "coordinator.bootstrap.task_generator.aiohttp.ClientSession",
+            "agora.coordinator.bootstrap.task_generator.aiohttp.ClientSession",
             return_value=_mock_post_response(resp),
         ):
             with pytest.raises(RuntimeError, match="Kanban task creation failed"):
@@ -147,7 +147,7 @@ class TestTaskGenerator:
         resp.json = AsyncMock(return_value={"task_id": "at1"})
 
         with patch(
-            "coordinator.bootstrap.task_generator.aiohttp.ClientSession",
+            "agora.coordinator.bootstrap.task_generator.aiohttp.ClientSession",
             return_value=_mock_post_response(resp),
         ):
             tid = await self.gen.create_approval_task("m1", "adopted")

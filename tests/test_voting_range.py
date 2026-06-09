@@ -1,6 +1,6 @@
 """Tests for coordinator/voting/range_voting.py."""
 
-from coordinator.voting.range_voting import RangeVoting
+from agora.coordinator.voting.range_voting import RangeVoting
 
 
 class TestRangeVoting:

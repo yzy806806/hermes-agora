@@ -10,8 +10,8 @@ import aiosqlite
 import pytest
 import pytest_asyncio
 
-from coordinator.history_pattern import HistoryPattern
-from coordinator.storage.schema import SCHEMA_SQL
+from agora.coordinator.history_pattern import HistoryPattern
+from agora.coordinator.storage.schema import SCHEMA_SQL
 
 
 async def _init_db(db_path: str) -> None:

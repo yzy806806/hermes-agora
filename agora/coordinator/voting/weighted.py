@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from coordinator.voting.weighted_types import WeightedVoteResult
+from .weighted_types import WeightedVoteResult
 
 
 class WeightedVoting:

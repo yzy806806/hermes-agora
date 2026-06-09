@@ -3,8 +3,8 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from coordinator.voting.manager import AdvancedVotingManager
-from coordinator.models import MotionStatus, VotingMethod
+from agora.coordinator.voting.manager import AdvancedVotingManager
+from agora.coordinator.models import MotionStatus, VotingMethod
 
 
 @pytest.fixture

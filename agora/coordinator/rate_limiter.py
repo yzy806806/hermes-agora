@@ -2,7 +2,7 @@
 import time
 from collections import defaultdict
 
-from coordinator.input_validation import ValidationConfig
+from .input_validation import ValidationConfig
 
 
 class RateLimiter:

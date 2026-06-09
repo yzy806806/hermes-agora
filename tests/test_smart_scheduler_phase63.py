@@ -5,12 +5,12 @@ into the scheduler's decision flow.
 """
 import pytest
 
-from coordinator.config import Settings
-from coordinator.models import MotionStatus
-from coordinator.smart_scheduler import SmartDiscussionScheduler
-from coordinator.state import StateMachine
-from coordinator.storage import Storage
-from coordinator.ws import ConnectionManager
+from agora.coordinator.config import Settings
+from agora.coordinator.models import MotionStatus
+from agora.coordinator.smart_scheduler import SmartDiscussionScheduler
+from agora.coordinator.state import StateMachine
+from agora.coordinator.storage import Storage
+from agora.coordinator.ws import ConnectionManager
 
 
 def _make_config(**overrides) -> Settings:

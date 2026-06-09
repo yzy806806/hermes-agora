@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from coordinator.timeout import TimeoutAction, TimeoutConfig, TimeoutManager
+from agora.coordinator.timeout import TimeoutAction, TimeoutConfig, TimeoutManager
 
 
 # -- TimeoutConfig --

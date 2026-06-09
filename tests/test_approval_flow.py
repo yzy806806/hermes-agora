@@ -11,8 +11,8 @@ import pytest_asyncio
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from coordinator.bootstrap.approval_flow import ApprovalFlow, ApprovalStatus
-from coordinator.storage.schema import SCHEMA_SQL
+from agora.coordinator.bootstrap.approval_flow import ApprovalFlow, ApprovalStatus
+from agora.coordinator.storage.schema import SCHEMA_SQL
 
 
 @pytest.fixture(scope="module")

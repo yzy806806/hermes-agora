@@ -10,7 +10,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from coordinator.bootstrap.discussion_driver import (
+from agora.coordinator.bootstrap.discussion_driver import (
     DiscussionConfig, DiscussionDriver, DiscussionResult,
 )
 
@@ -66,7 +66,7 @@ class TestDiscussionDriver:
         session.__aexit__ = AsyncMock(return_value=False)
 
         with patch(
-            "coordinator.bootstrap.discussion_driver.aiohttp.ClientSession",
+            "agora.coordinator.bootstrap.discussion_driver.aiohttp.ClientSession",
             return_value=session,
         ):
             mid = await self.driver._create_motion("T", "D", "rc")
@@ -94,7 +94,7 @@ class TestDiscussionDriver:
         session.__aexit__ = AsyncMock(return_value=False)
 
         with patch(
-            "coordinator.bootstrap.discussion_driver.aiohttp.ClientSession",
+            "agora.coordinator.bootstrap.discussion_driver.aiohttp.ClientSession",
             return_value=session,
         ):
             with pytest.raises(RuntimeError, match="Motion creation failed"):
@@ -119,7 +119,7 @@ class TestDiscussionDriver:
         session.__aexit__ = AsyncMock(return_value=False)
 
         with patch(
-            "coordinator.bootstrap.discussion_driver.aiohttp.ClientSession",
+            "agora.coordinator.bootstrap.discussion_driver.aiohttp.ClientSession",
             return_value=session,
         ):
             result = await self.driver._check_motion_status("m1")
@@ -141,7 +141,7 @@ class TestDiscussionDriver:
         session.__aexit__ = AsyncMock(return_value=False)
 
         with patch(
-            "coordinator.bootstrap.discussion_driver.aiohttp.ClientSession",
+            "agora.coordinator.bootstrap.discussion_driver.aiohttp.ClientSession",
             return_value=session,
         ):
             ok = await self.driver.cancel_discussion("m1")

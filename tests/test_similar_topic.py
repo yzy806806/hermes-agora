@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from coordinator.similar_topic import SimilarTopicDetector
+from agora.coordinator.similar_topic import SimilarTopicDetector
 
 
 @pytest.fixture

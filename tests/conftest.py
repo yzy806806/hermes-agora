@@ -5,8 +5,8 @@ import asyncio
 import pytest
 import pytest_asyncio
 
-from coordinator.storage import Storage
-from coordinator.judgment_tracker import JudgmentTracker
+from agora.coordinator.storage import Storage
+from agora.coordinator.judgment_tracker import JudgmentTracker
 
 
 @pytest.fixture(scope="session")

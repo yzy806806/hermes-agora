@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from coordinator.models import MotionStatus, VotingMethod
-from coordinator.router import init_deps, router
-from coordinator.state import InvalidTransitionError, StateMachine
+from agora.coordinator.models import MotionStatus, VotingMethod
+from agora.coordinator.router import init_deps, router
+from agora.coordinator.state import InvalidTransitionError, StateMachine
 
 
 @pytest.fixture
@@ -119,7 +119,7 @@ class TestMotionAPI:
         assert resp.status_code == 404
 
     def test_start_motion(self, client, mock_storage, mock_sm):
-        with patch("coordinator.router.manager") as ws_mgr:
+        with patch("agora.coordinator.router.manager") as ws_mgr:
             ws_mgr.broadcast = AsyncMock()
             resp = client.post("/motions/m1/start")
         assert resp.status_code == 200
@@ -129,7 +129,7 @@ class TestMotionAPI:
         mock_sm.transition = AsyncMock(
             side_effect=InvalidTransitionError("bad")
         )
-        with patch("coordinator.router.manager") as ws_mgr:
+        with patch("agora.coordinator.router.manager") as ws_mgr:
             ws_mgr.broadcast = AsyncMock()
             resp = client.post("/motions/m1/start")
         assert resp.status_code == 409

@@ -3,11 +3,11 @@
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
-from coordinator.storage import Storage
-from coordinator.dashboard import init_dashboard_deps
-from coordinator.router import init_deps
-from coordinator.state import StateMachine
-from coordinator.main import create_app
+from agora.coordinator.storage import Storage
+from agora.coordinator.dashboard import init_dashboard_deps
+from agora.coordinator.router import init_deps
+from agora.coordinator.state import StateMachine
+from agora.coordinator.main import create_app
 
 
 @pytest_asyncio.fixture(loop_scope="session")
@@ -84,7 +84,7 @@ async def test_api_get_events_with_params(client):
 @pytest.mark.asyncio(loop_scope="session")
 async def test_api_events_stream_is_sse():
     """Verify SSE endpoint route is registered correctly."""
-    from coordinator.dashboard import router
+    from agora.coordinator.dashboard import router
     # Verify the route is registered with correct path
     paths = [getattr(r, "path", "") for r in router.routes]
     assert "/events/stream" in paths

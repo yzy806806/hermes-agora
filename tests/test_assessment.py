@@ -1,7 +1,7 @@
 """Tests for coordinator/assessment.py."""
 
 import pytest
-from coordinator.assessment import (
+from agora.coordinator.assessment import (
     Assessment,
     AssessmentResult,
     ConsensusDetector,
@@ -9,7 +9,7 @@ from coordinator.assessment import (
     DiscussionMetrics,
     QualityAssessor,
 )
-from coordinator.models import Stance
+from agora.coordinator.models import Stance
 
 
 # ---- ConsensusDetector ----

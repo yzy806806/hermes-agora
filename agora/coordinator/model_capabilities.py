@@ -11,7 +11,7 @@ from enum import Flag
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from coordinator.storage.storage import Storage
+    from .storage.storage import Storage
 
 
 class ModelCapability(Flag):

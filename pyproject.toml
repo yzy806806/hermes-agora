@@ -1,7 +1,7 @@
 [project]
-name = "hermes-agora"
-version = "0.8.0"
-description = "Multi-Agent Deliberation Framework for Hermes"
+name = "agora"
+version = "0.9.0"
+description = "Multi-Agent Deliberation Platform"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
@@ -15,6 +15,7 @@ dependencies = [
     "httpx>=0.27",
     "aiohttp>=3.9",
     "prometheus-client>=0.20",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -27,15 +28,16 @@ dev = [
 ]
 
 [project.scripts]
-agora-coordinator = "coordinator.main:main"
-agora-agent = "agent_client.client:main"
+agora = "agora.cli:main"
+agora-coordinator = "agora.coordinator.main:main"
+agora-agent = "agora.agent_client.client:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["coordinator", "agent_client"]
+packages = ["agora"]
 
 [tool.pytest.ini_options]
 markers = [

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from coordinator.memory_sync import MemorySync
+from agora.coordinator.memory_sync import MemorySync
 
 
 def _make_storage(motion=None, votes=None, messages=None):

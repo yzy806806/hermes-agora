@@ -12,9 +12,9 @@ import pytest_asyncio
 # Ensure project root is on sys.path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from coordinator.bootstrap.trigger_types import TriggerEvent, TriggerType
-from coordinator.bootstrap.trigger_manager import TriggerManager
-from coordinator.storage.schema import SCHEMA_SQL
+from agora.coordinator.bootstrap.trigger_types import TriggerEvent, TriggerType
+from agora.coordinator.bootstrap.trigger_manager import TriggerManager
+from agora.coordinator.storage.schema import SCHEMA_SQL
 
 
 @pytest.fixture(scope="module")

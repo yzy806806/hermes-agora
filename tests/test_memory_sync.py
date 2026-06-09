@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from coordinator.conclusion_types import DiscussionConclusion
-from coordinator.memory_sync import MemorySync
+from agora.coordinator.conclusion_types import DiscussionConclusion
+from agora.coordinator.memory_sync import MemorySync
 
 
 def _make_storage(motion=None, votes=None, messages=None):

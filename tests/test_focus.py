@@ -3,8 +3,8 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from coordinator.focus import DisagreementFocus
-from coordinator.models import Stance
+from agora.coordinator.focus import DisagreementFocus
+from agora.coordinator.models import Stance
 
 
 def _make_storage(messages: list[dict]) -> MagicMock:

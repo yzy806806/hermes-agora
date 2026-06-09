@@ -2,7 +2,7 @@
 
 import pytest
 
-from coordinator.storage import Storage
+from agora.coordinator.storage import Storage
 
 
 @pytest.mark.asyncio

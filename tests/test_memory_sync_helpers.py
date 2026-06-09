@@ -1,7 +1,7 @@
 """Tests for MemorySync helper methods."""
 
-from coordinator.conclusion_types import DiscussionConclusion
-from coordinator.memory_sync import MemorySync
+from agora.coordinator.conclusion_types import DiscussionConclusion
+from agora.coordinator.memory_sync import MemorySync
 
 
 class TestExtractKeyPoints:

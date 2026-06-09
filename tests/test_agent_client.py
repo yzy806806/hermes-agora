@@ -3,8 +3,8 @@
 import pytest
 import httpx
 
-from agent_client.config import AgoraConfig
-from agent_client.client import AgoraClient
+from agora.agent_client.config import AgoraConfig
+from agora.agent_client.client import AgoraClient
 
 
 class MockTransport(httpx.AsyncBaseTransport):

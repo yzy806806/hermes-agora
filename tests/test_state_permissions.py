@@ -2,9 +2,9 @@
 
 import pytest
 
-from coordinator.models import MotionStatus
-from coordinator.state import StateMachine
-from coordinator.storage import Storage
+from agora.coordinator.models import MotionStatus
+from agora.coordinator.state import StateMachine
+from agora.coordinator.storage import Storage
 
 
 async def _make_motion(storage: Storage, rounds: int = 3) -> str:

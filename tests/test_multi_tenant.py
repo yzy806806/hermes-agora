@@ -10,11 +10,11 @@ from pathlib import Path
 
 import pytest
 
-from coordinator.tenant.models import Tenant, TenantConfig
-from coordinator.storage.global_store import GlobalStorage
-from coordinator.storage.storage_manager import StorageManager
-from coordinator.tenant.manager import TenantManager
-from coordinator.tenant.guard import TenantResourceGuard
+from agora.coordinator.tenant.models import Tenant, TenantConfig
+from agora.coordinator.storage.global_store import GlobalStorage
+from agora.coordinator.storage.storage_manager import StorageManager
+from agora.coordinator.tenant.manager import TenantManager
+from agora.coordinator.tenant.guard import TenantResourceGuard
 
 
 # --- TenantConfig & Tenant models ---

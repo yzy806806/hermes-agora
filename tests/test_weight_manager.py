@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import AsyncMock
 
-from coordinator.voting.weight_manager import WeightManager, WeightSource
+from agora.coordinator.voting.weight_manager import WeightManager, WeightSource
 
 
 @pytest.fixture

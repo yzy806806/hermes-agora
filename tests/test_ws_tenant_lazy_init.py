@@ -4,8 +4,8 @@ from __future__ import annotations
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from coordinator.ws import ConnectionManager, ConnectionHub
-from coordinator.ws_endpoint import websocket_endpoint
+from agora.coordinator.ws import ConnectionManager, ConnectionHub
+from agora.coordinator.ws_endpoint import websocket_endpoint
 
 
 class TestLazyInitTenantDeps:
@@ -19,7 +19,7 @@ class TestLazyInitTenantDeps:
         assert hub._storage is None
 
         # Mock the module-level manager singleton
-        with patch("coordinator.ws_endpoint.manager", mgr):
+        with patch("agora.coordinator.ws_endpoint.manager", mgr):
             # Build a mock WebSocket with app.state.storage_mgr
             ws = MagicMock()
             ws.app.state.storage_mgr = AsyncMock()
@@ -45,7 +45,7 @@ class TestLazyInitTenantDeps:
         hub = mgr.get_hub("default")
         assert hub._storage is None
 
-        with patch("coordinator.ws_endpoint.manager", mgr):
+        with patch("agora.coordinator.ws_endpoint.manager", mgr):
             ws = MagicMock()
             ws.app.state.storage_mgr = AsyncMock()
             hub.connect = AsyncMock(return_value=False)
@@ -65,7 +65,7 @@ class TestLazyInitTenantDeps:
         hub._storage = MagicMock()
         hub._state_machine = MagicMock()
 
-        with patch("coordinator.ws_endpoint.manager", mgr):
+        with patch("agora.coordinator.ws_endpoint.manager", mgr):
             ws = MagicMock()
             ws.app.state.storage_mgr = AsyncMock()
             hub.connect = AsyncMock(return_value=False)
@@ -80,7 +80,7 @@ class TestLazyInitTenantDeps:
         """If app.state has no storage_mgr, no crash — just fails connect."""
         mgr = ConnectionManager()
 
-        with patch("coordinator.ws_endpoint.manager", mgr):
+        with patch("agora.coordinator.ws_endpoint.manager", mgr):
             ws = MagicMock()
             # No storage_mgr attribute
             del ws.app.state.storage_mgr

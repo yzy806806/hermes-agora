@@ -3,13 +3,13 @@
 import pytest
 from datetime import datetime, timezone
 
-from coordinator.observability.metrics import (
+from agora.coordinator.observability.metrics import (
     metrics, init_metrics, collect_metrics,
 )
-from coordinator.observability.events import (
+from agora.coordinator.observability.events import (
     EventType, Event, EventEmitter,
 )
-from coordinator.observability.trace import (
+from agora.coordinator.observability.trace import (
     Trace, new_trace, get_trace_id, set_trace_id, new_span,
 )
 

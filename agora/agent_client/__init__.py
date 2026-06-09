@@ -1,4 +1,4 @@
-"""Agent client package — Hermes-side client for the Agora Coordinator."""
+"""Agent client package — client library for the Agora Coordinator."""
 
 from .config import AgoraConfig, load_config
 from .client import AgoraClient

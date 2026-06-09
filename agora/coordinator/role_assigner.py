@@ -13,7 +13,7 @@ from .model_capabilities import ModelCapability, ModelProfiler
 from .models import DiscussionRole
 
 if TYPE_CHECKING:
-    from coordinator.storage.storage import Storage
+    from .storage.storage import Storage
 
 logger = logging.getLogger(__name__)
 

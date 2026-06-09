@@ -1,4 +1,4 @@
-"""Hermes Agora Coordinator — FastAPI service for multi-agent deliberation.
+"""Agora Coordinator — FastAPI service for multi-agent deliberation.
 
 Provides HTTP REST API + WebSocket real-time communication for managing
 discussions, voting, and agent coordination.

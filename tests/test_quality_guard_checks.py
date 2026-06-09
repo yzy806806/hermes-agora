@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from coordinator.quality_guard import QualityGuard
-from coordinator.quality_guard_models import (
+from agora.coordinator.quality_guard import QualityGuard
+from agora.coordinator.quality_guard_models import (
     QualityGuardConfig,
     QualityIssue,
 )

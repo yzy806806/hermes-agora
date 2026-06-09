@@ -1,9 +1,9 @@
 """Tests for DynamicRoundManager — adaptive round control."""
 import pytest
 
-from coordinator.assessment import ConsensusLevel
-from coordinator.dynamic_rounds import DynamicRoundManager, RoundConfig
-from coordinator.storage import Storage
+from agora.coordinator.assessment import ConsensusLevel
+from agora.coordinator.dynamic_rounds import DynamicRoundManager, RoundConfig
+from agora.coordinator.storage import Storage
 
 
 async def _seed_motion(

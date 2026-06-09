@@ -1,9 +1,9 @@
 """Tests for RealTimeEvaluator — instant consensus and early termination."""
 import pytest
 
-from coordinator.assessment import ConsensusLevel
-from coordinator.realtime_evaluator import RealTimeEvaluator, RealTimeEvalResult
-from coordinator.storage import Storage
+from agora.coordinator.assessment import ConsensusLevel
+from agora.coordinator.realtime_evaluator import RealTimeEvaluator, RealTimeEvalResult
+from agora.coordinator.storage import Storage
 
 
 async def _seed_agents(storage: Storage, count: int, prefix: str = "a") -> None:

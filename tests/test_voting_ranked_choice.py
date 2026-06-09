@@ -1,6 +1,6 @@
 """Tests for coordinator/voting/ranked_choice.py (IRV)."""
 
-from coordinator.voting.ranked_choice import RankedChoiceVoting
+from agora.coordinator.voting.ranked_choice import RankedChoiceVoting
 
 
 class TestRankedChoiceVoting:

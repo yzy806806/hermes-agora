@@ -1,7 +1,7 @@
 """Tests for RateLimiter."""
 import pytest
-from coordinator.input_validation import ValidationConfig
-from coordinator.rate_limiter import RateLimiter
+from agora.coordinator.input_validation import ValidationConfig
+from agora.coordinator.rate_limiter import RateLimiter
 
 
 class TestRateLimiter:
