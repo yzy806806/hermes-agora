@@ -62,7 +62,32 @@ Agora 管理的"项目"不限于 GitHub 仓库：
 4. **API 速率限制** — TPM 限速（Phase 9.4 待开发）
 5. **Web Dashboard** — 讨论记录、项目进度、设置界面（Phase 11+）
 
-## Agent 接入策略（2026-06-09 决策）
+## Agent 自我进化策略（2026-06-10 决策 + 调研结论）
+
+**Agora 必须让接入的 agent 保留自我进化能力（memory + skill），这是 Agora 区别于"无状态 LLM 调度器"的核心价值。**
+
+### 调研结论：Hermes Kanban 的 memory/skill 可用性
+
+- **Kanban worker（子代理）**：通过 `hermes -p <profile> chat -q` 启动，不走 cron scheduler，**不会传 `skip_memory=True`**。`memory`、`skills_list`、`skill_view`、`skill_manage` 工具全部正常可用。✅
+- **Cron 任务（maintainer）**：走 cron scheduler，传了 `skip_memory=True`，**memory 工具被跳过初始化**。maintainer 无法写 memory，但 skill 工具正常。❌ memory / ✅ skill
+- **结论**：只需给 profile 配置 `toolsets` 包含 `memory` + `skills`，子代理就能自我进化。maintainer 的 memory 问题可以通过直接读写 `~/.hermes/profiles/maintainer/memory.md` 文件绕过。
+
+### Agora 的设计方向
+
+Agora coordinator 不替代 agent 的 skill/memory 机制——那是 agent 自己的事。Agora 只需要：
+
+1. **Session 持久化** — 每个 agent 的每次"任务执行"是一个 session，coordinator 存储完整的 session 数据（输入、输出、工具调用、错误）。agent 可以在下次任务时检索历史 session，实现"经验积累"。
+2. **Agent 状态协议** — 注册时声明 capabilities（包括是否支持 skill/memory），coordinator 分配任务时考虑 agent 的经验积累。
+3. **不重新发明轮子** — 用 Hermes 的 agent 自带 skill/memory，用 OpenClaw 的 agent 自带它的持久化机制。Agora 只提供 session 记录和检索 API。
+
+### 实操：当前团队
+
+已完成的配置：
+- 五个 profile 的 `toolsets` 全部设为 `['hermes-cli', 'memory', 'skills']`
+- 五个 SOUL 全部加入自我进化规则（写 memory + 生成 skill + 提 SOUL 建议）
+- maintainer SOUL 加入 ROADMAP 同步 + skill 检查
+
+预期效果：团队越跑越聪明——token 截断经验、代码审查清单、发布流程 check 都会沉淀为 skill 和 memory，不再每次从零开始。
 
 **不自己开发 Agent Runtime。** Agora 只做 Coordinator（讨论 + 调度），agent 全部用现成的。
 
