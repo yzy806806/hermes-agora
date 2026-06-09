@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.9.1 (2026-06-10)
+
+### Added
+- **Phase 9.2a Task Models + Storage**: Task data models (`task_models.py`) with status, priority, assignments; persistent task storage (`storage/tasks.py`) with schema v6
+- **Phase 9.2b Task Generator**: LLM-driven task generation (`task_gen/generator.py`) with heuristic fallback (`task_gen/heuristic.py`), prompts (`task_gen/prompts.py`), and validation (`task_gen/validation.py`)
+- **Phase 9.2c Task Assigner**: Capability-based agent matching with round-robin fallback (`task_assign.py`)
+- **Task Execution + Verification**: `task_exec.py` for executing tasks, `task_verify.py` for result validation
+- **Comprehensive Tests**: 9 test files covering task models, storage, generation (LLM + heuristic), assignment, execution, verification, and message types
+
+### Changed
+- Schema version bumped to 6 (task tables)
+- Storage layer extended with task CRUD operations
+- Coordinator models updated with new task-related fields
+
 ## v0.9.0 (2026-06-10)
 
 ### Changed
