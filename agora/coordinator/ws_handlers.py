@@ -130,7 +130,7 @@ async def handle_speak(
     )
 
     broadcast_msg = {
-        "type": MessageType.BROADCAST,
+        "type": MessageType.SPEECH_ADDED,
         "motion_id": motion_id,
         "agent_id": agent_id,
         "payload": {
@@ -140,7 +140,7 @@ async def handle_speak(
     }
     await mgr.broadcast(broadcast_msg, exclude=[agent_id])
     await mgr.send(agent_id, {
-        "type": MessageType.BROADCAST,
+        "type": MessageType.SPEECH_ADDED,
         "motion_id": motion_id,
         "payload": {"delivered": True},
     })

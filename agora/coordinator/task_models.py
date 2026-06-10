@@ -41,6 +41,7 @@ class TaskNode(BaseModel):
     depends_on: list[str] = Field(default_factory=list)
     artifact_paths: list[str] = Field(default_factory=list)
     error_message: Optional[str] = None
+    retry_count: int = 0  # Phase 10.1e: how many times retried
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
@@ -54,5 +55,39 @@ class TaskGraph(BaseModel):
     motion_id: str
     tasks: list[TaskNode] = Field(default_factory=list)
     created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    # Phase 10: parallel execution metadata
+    parallel_mode: str = "auto"  # auto | sequential | parallel
+    max_parallel_slots: int = 10  # global cap
+    resource_conflict_policy: str = "warn"  # warn | abort | queue
+    abort_on_failure: bool = False  # Phase 10.1e: cancel graph on any failure
+
+
+class ExecutionSlot(BaseModel):
+    """Tracks one concurrent execution slot (Phase 10)."""
+    task_id: str
+    agent_id: str
+    started_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    status: str = "running"  # running | completing
+
+
+class ConflictReport(BaseModel):
+    """Reports a resource conflict between two tasks (Phase 10)."""
+    task_a: str
+    task_b: str
+    resource_path: str
+    conflict_type: str = "write-write"  # write-write | read-write
+
+
+class ResourceLock(BaseModel):
+    """Tracks resource conflicts between parallel tasks (Phase 10)."""
+    resource_path: str  # e.g. "src/module.py"
+    locked_by: str  # task_id holding the lock
+    waiting_tasks: list[str] = Field(default_factory=list)
+    lock_type: str = "write"  # write | read
+    acquired_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )

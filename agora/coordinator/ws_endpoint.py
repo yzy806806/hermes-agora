@@ -2,6 +2,7 @@
 
 Phase 8.2: Added tenant_id parameter for per-tenant isolation.
 Phase 9.3: Added token query param for WS auth + approval check.
+Phase 10.2d: Added RBAC role check on WS connect.
 Routes messages through tenant-specific ConnectionHub.
 """
 
@@ -15,6 +16,7 @@ from fastapi import WebSocket
 from .input_validation import InputValidator
 from .models import MessageType
 from .observability.trace import set_trace_id
+from .rbac import Permission, Role, check_permission, rbac_enforced
 from .rate_limiter import RateLimiter
 from .token_rate_limiter import TokenRateLimiter
 from .ws import manager
@@ -74,6 +76,17 @@ async def websocket_endpoint(
             if agent.get("agent_token"):
                 await websocket.close(code=4003, reason="Token required")
                 return
+
+    # Phase 10.2d: RBAC role-based access check on WS connect
+    if rbac_enforced() and agent is not None:
+        agent_role_str = agent.get("role", "agent")
+        try:
+            role = Role(agent_role_str)
+        except ValueError:
+            role = Role.AGENT
+        if not check_permission(role, Permission.AGENT_REGISTER):
+            await websocket.close(code=4003, reason="Insufficient permissions")
+            return
 
     if not await hub.connect(agent_id, websocket):
         return
@@ -176,12 +189,30 @@ async def _route_message(agent_id: str, raw: str, hub) -> None:
             agent_id, payload, storage, sm, hub)
     elif msg_type == MessageType.TASK_STATUS:
         from .task_exec import handle_task_status
-        await handle_task_status(agent_id, payload, storage, hub)
+        parallel_coord = getattr(hub, "_app_state", None)
+        if parallel_coord:
+            parallel_coord = getattr(parallel_coord, "parallel_coord", None)
+        await handle_task_status(
+            agent_id, payload, storage, hub, parallel_coord)
     elif msg_type == MessageType.TASK_ACCEPT_RESULT:
         from .task_verify import handle_task_accept_result
         await handle_task_accept_result(agent_id, payload, storage, hub)
+    elif msg_type == MessageType.TASK_STARTED:
+        from .task_exec import handle_task_started
+        parallel_coord = getattr(hub, "_app_state", None)
+        if parallel_coord:
+            parallel_coord = getattr(parallel_coord, "parallel_coord", None)
+        await handle_task_started(
+            agent_id, payload, storage, hub, parallel_coord)
+    elif msg_type == MessageType.TASK_PROGRESS:
+        from .task_exec import handle_task_progress
+        await handle_task_progress(agent_id, payload, storage, hub)
     elif msg_type == MessageType.HEARTBEAT:
         await handle_heartbeat(agent_id, payload, storage, hub)
+    elif msg_type == MessageType.NEW_MOTION:
+        # NEW_MOTION is coordinator→agent broadcast only (sent via
+        # router.py start_motion); agents never send this type.
+        logger.debug("Ignoring NEW_MOTION from agent %s", agent_id)
     elif msg_type == MessageType.RATE_LIMIT_REPORT:
         from .ws_rate_limit import check_and_warn
         tokens_used = payload.get("tokens_used", 0)

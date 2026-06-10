@@ -53,8 +53,8 @@ class InputValidator:
         return payload
 
     def validate_vote_payload(self, payload: dict) -> dict:
-        """Validate vote data."""
-        choice = payload.get("choice")
-        if choice not in ("for", "against", "abstain"):
-            raise ValueError(f"Invalid vote choice: {choice!r}")
+        """Validate vote data. Field name is 'vote' (matching ws_vote.py)."""
+        vote = payload.get("vote")
+        if vote not in ("for", "against", "abstain"):
+            raise ValueError(f"Invalid vote: {vote!r}")
         return payload

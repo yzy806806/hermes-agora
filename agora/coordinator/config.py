@@ -98,10 +98,28 @@ class Settings(BaseSettings):
     require_approval: bool = False        # env: AGORA_REQUIRE_APPROVAL
     admin_token: str = ""                 # env: AGORA_ADMIN_TOKEN
 
+    # Phase 10.2: RBAC configuration
+    rbac_enforce: bool = False            # env: AGORA_RBAC_ENFORCE
+    jwt_secret: str = ""                  # env: AGORA_JWT_SECRET
+
+    # Phase 10.3: Plugin configuration
+    plugins_enabled: list[str] = Field(default_factory=list)   # whitelist
+    plugins_disabled: list[str] = Field(default_factory=list)  # blacklist
+
+    # Phase 10.1: Parallel execution
+    parallel_mode: str = "auto"           # auto | sequential | parallel
+
     # Heartbeat configuration
     heartbeat_interval_seconds: int = 30
     heartbeat_timeout_seconds: int = 120
     heartbeat_max_missed: int = 3
+
+    # Plugin sandbox configuration
+    plugin_blocked_imports: list[str] = Field(
+        default_factory=lambda: ["os", "subprocess", "socket", "ctypes"]
+    )
+    plugin_default_timeout_seconds: int = 30
+    plugin_memory_limit_mb: int = 100
 
     # Timeout configuration
     round_timeout_seconds: int = 300

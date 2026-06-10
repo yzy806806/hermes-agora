@@ -103,6 +103,6 @@ async def registered_agents(
                     "role": "participant",
                 },
             )
-            assert r.status_code == 200, r.text
+            assert r.status_code == 201, r.text
             agents.append(r.json())
     return agents

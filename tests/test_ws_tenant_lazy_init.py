@@ -22,15 +22,18 @@ class TestLazyInitTenantDeps:
         with patch("agora.coordinator.ws_endpoint.manager", mgr):
             # Build a mock WebSocket with app.state.storage_mgr
             ws = MagicMock()
+            ws.close = AsyncMock()
             ws.app.state.storage_mgr = AsyncMock()
+            tenant_storage = AsyncMock()
+            tenant_storage.get_agent = AsyncMock(return_value=None)
             ws.app.state.storage_mgr.get_tenant_storage = AsyncMock(
-                return_value=MagicMock()
+                return_value=tenant_storage
             )
             # hub.connect will fail (no agent registered), but deps
             # should be set before connect is called
             hub.connect = AsyncMock(return_value=False)
 
-            await websocket_endpoint(ws, "agent1", "acme")
+            await websocket_endpoint(ws, "agent1", tenant_id="acme")
 
             # storage_mgr.get_tenant_storage was called for "acme"
             ws.app.state.storage_mgr.get_tenant_storage.assert_awaited_once_with("acme")
@@ -47,6 +50,7 @@ class TestLazyInitTenantDeps:
 
         with patch("agora.coordinator.ws_endpoint.manager", mgr):
             ws = MagicMock()
+            ws.close = AsyncMock()
             ws.app.state.storage_mgr = AsyncMock()
             hub.connect = AsyncMock(return_value=False)
 
@@ -62,15 +66,18 @@ class TestLazyInitTenantDeps:
         """If hub already has deps, lazy-init is skipped."""
         mgr = ConnectionManager()
         hub = mgr.get_hub("acme")
-        hub._storage = MagicMock()
+        storage = AsyncMock()
+        storage.get_agent = AsyncMock(return_value=None)
+        hub._storage = storage
         hub._state_machine = MagicMock()
 
         with patch("agora.coordinator.ws_endpoint.manager", mgr):
             ws = MagicMock()
+            ws.close = AsyncMock()
             ws.app.state.storage_mgr = AsyncMock()
             hub.connect = AsyncMock(return_value=False)
 
-            await websocket_endpoint(ws, "agent1", "acme")
+            await websocket_endpoint(ws, "agent1", tenant_id="acme")
 
             # storage_mgr should NOT be called — already inited
             ws.app.state.storage_mgr.get_tenant_storage.assert_not_awaited()
@@ -82,12 +89,13 @@ class TestLazyInitTenantDeps:
 
         with patch("agora.coordinator.ws_endpoint.manager", mgr):
             ws = MagicMock()
+            ws.close = AsyncMock()  # B6: make websocket.close() awaitable
             # No storage_mgr attribute
             del ws.app.state.storage_mgr
             hub = mgr.get_hub("acme")
             hub.connect = AsyncMock(return_value=False)
 
-            await websocket_endpoint(ws, "agent1", "acme")
+            await websocket_endpoint(ws, "agent1", tenant_id="acme")
 
             # hub._storage still None, but no exception raised
             assert hub._storage is None

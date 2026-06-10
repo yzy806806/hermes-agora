@@ -1,6 +1,6 @@
 # Agora API 参考
 
-> 版本: v0.9.3 | 基础路径: `/api/v1`
+> 版本: v0.10.0 | 基础路径: `/api/v1`
 
 ## REST API
 
@@ -496,6 +496,144 @@
 
 ---
 
+## Phase 10.2: RBAC 端点
+
+### POST /auth/tokens
+
+创建新 API Token。
+
+**请求体**:
+```json
+{
+  "principal_id": "agent-alpha",
+  "role": "agent",
+  "scopes": ["discussion:create", "task:execute"],
+  "expires_in": 3600
+}
+```
+
+**响应**:
+```json
+{
+  "token_id": "tk-xxx",
+  "token": "eyJ...",
+  "role": "agent",
+  "scopes": ["discussion:create", "task:execute"],
+  "expires_at": "2026-06-10T13:00:00Z"
+}
+```
+
+**状态码**:
+- `201` — 创建成功
+- `403` — 无权限创建该角色 token
+
+---
+
+### GET /auth/tokens
+
+列出活跃 Token（需要 ADMIN 权限）。
+
+**响应**: `TokenInfo[]` 数组
+
+---
+
+### POST /auth/tokens/{token_id}/rotate
+
+轮换 Token（撤销旧 token，签发同权限新 token）。
+
+**响应**: `{"token_id": "tk-new", "token": "eyJ...", "expires_at": "..."}`
+
+---
+
+### DELETE /auth/tokens/{token_id}
+
+撤销 Token。
+
+**响应**: `{"status": "revoked"}`
+
+---
+
+### GET /auth/roles
+
+列出所有角色及其权限。
+
+**响应**:
+```json
+{
+  "roles": {
+    "superadmin": {"permissions": ["all"]},
+    "admin": {"permissions": ["agent:approve", "agent:config", "..."]},
+    "agent": {"permissions": ["agent:register", "discussion:create", "..."]},
+    "observer": {"permissions": ["discussion:view", "task:view", "..."]},
+    "plugin": {"permissions": ["system:plugins"]}
+  }
+}
+```
+
+---
+
+### GET /auth/audit
+
+查询审计日志。
+
+**查询参数**:
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `principal_id` | string | null | 过滤操作主体 |
+| `action` | string | null | 过滤操作类型 |
+| `since` | string | null | ISO 时间戳，返回此时间后的记录 |
+| `limit` | int | 100 | 返回数量上限 |
+
+**响应**: `AuditEvent[]` 数组
+
+---
+
+## Phase 10.3: 插件端点
+
+### GET /plugins
+
+列出已加载插件。
+
+**响应**:
+```json
+{
+  "plugins": [
+    {
+      "name": "agora-plugin-github-webhook",
+      "version": "1.0.0",
+      "status": "active",
+      "hooks": ["discussion.created", "task.completed"]
+    }
+  ]
+}
+```
+
+---
+
+### POST /plugins/{name}/reload
+
+重新加载指定插件。
+
+**响应**: `{"status": "reloaded", "name": "agora-plugin-github-webhook"}`
+
+---
+
+### GET /plugins/hooks
+
+列出所有 HookPoint 及已注册的插件。
+
+**响应**:
+```json
+{
+  "hooks": {
+    "discussion.created": ["github-webhook-plugin"],
+    "task.completed": ["github-webhook-plugin", "slack-notifier-plugin"]
+  }
+}
+```
+
+---
+
 ## WebSocket 协议
 
 ### 连接
@@ -868,6 +1006,88 @@ ws://host:8765/ws/{agent_id}?token=ag-xxx&tenant_id=default
 }
 ```
 
+#### TASK_STARTED — 任务开始执行（Phase 10.1）
+
+```json
+{
+  "type": "TASK_STARTED",
+  "task_id": "task-001",
+  "agent_id": "agent-alpha",
+  "payload": {
+    "started_at": "2026-06-10T12:00:00Z"
+  }
+}
+```
+
+#### TASK_BLOCKED — 任务被资源冲突阻塞（Phase 10.1）
+
+```json
+{
+  "type": "TASK_BLOCKED",
+  "task_id": "task-001",
+  "agent_id": "agent-alpha",
+  "payload": {
+    "reason": "resource_conflict",
+    "waiting_for": ["task-002"]
+  }
+}
+```
+
+#### TASK_UNBLOCKED — 资源释放，任务恢复（Phase 10.1）
+
+```json
+{
+  "type": "TASK_UNBLOCKED",
+  "task_id": "task-001",
+  "agent_id": "agent-alpha",
+  "payload": {}
+}
+```
+
+#### TASK_RETRY — 请求重试失败任务（Phase 10.1）
+
+```json
+{
+  "type": "TASK_RETRY",
+  "task_id": "task-001",
+  "agent_id": "agent-alpha",
+  "payload": {
+    "reason": "transient_error",
+    "max_attempts": 3
+  }
+}
+```
+
+#### TASK_PROGRESS — 任务进度更新（Phase 10.1）
+
+```json
+{
+  "type": "TASK_PROGRESS",
+  "task_id": "task-001",
+  "agent_id": "agent-alpha",
+  "payload": {
+    "progress_pct": 0.6,
+    "message": "60% complete"
+  }
+}
+```
+
+#### GRAPH_COMPLETE — 任务图全部完成（Phase 10.1）
+
+```json
+{
+  "type": "GRAPH_COMPLETE",
+  "payload": {
+    "graph_id": "graph-xxx",
+    "summary": {
+      "total": 5,
+      "completed": 4,
+      "failed": 1
+    }
+  }
+}
+```
+
 #### ERROR — 错误
 
 ```json
@@ -934,6 +1154,12 @@ ws://host:8765/ws/{agent_id}?token=ag-xxx&tenant_id=default
 | `rate_limited` | 速率限制触发 (Phase 9.4) |
 | `task_not_found` | 任务不存在 (Phase 9.2) |
 | `task_status_invalid` | 任务状态转换非法 (Phase 9.2) |
+| `permission_denied` | 权限不足 (Phase 10.2) |
+| `token_expired` | Token 已过期 (Phase 10.2) |
+| `token_revoked` | Token 已撤销 (Phase 10.2) |
+| `invalid_role` | 角色不存在 (Phase 10.2) |
+| `plugin_not_found` | 插件不存在 (Phase 10.3) |
+| `plugin_load_failed` | 插件加载失败 (Phase 10.3) |
 
 ---
 
@@ -1066,3 +1292,30 @@ ws://host:8765/ws/{agent_id}?token=ag-xxx&tenant_id=team-alpha
 
 不带 `tenant_id` 时默认使用 `"default"` 租户（向后兼容）。
 同一租户的 Agent 只能看到同租户的消息和事件。
+
+## Phase 10: 插件 Hook 点
+
+插件可通过 `PluginCoordinator.register_hook()` 订阅以下生命周期事件：
+
+| HookPoint | 触发时机 | HookContext 字段 |
+|-----------|---------|-----------------|
+| `discussion.created` | 议题创建 | motion_id |
+| `discussion.started` | 讨论开始 | motion_id |
+| `discussion.closed` | 讨论关闭 | motion_id |
+| `round.started` | 新轮次开始 | motion_id, data.round |
+| `round.completed` | 轮次结束 | motion_id, data.round |
+| `vote.cast` | 投票提交 | motion_id, agent_id |
+| `vote.finalized` | 投票完成 | motion_id |
+| `task.created` | 任务创建 | task_id |
+| `task.assigned` | 任务分配 | task_id, agent_id |
+| `task.started` | 任务开始执行 | task_id, agent_id |
+| `task.completed` | 任务完成 | task_id, agent_id |
+| `task.failed` | 任务失败 | task_id, agent_id |
+| `task.verified` | 任务验证完成 | task_id |
+| `graph.completed` | 任务图完成 | data.graph_id |
+| `agent.registered` | Agent 注册 | agent_id |
+| `agent.approved` | Agent 审批通过 | agent_id |
+| `agent.online` | Agent 上线 | agent_id |
+| `agent.offline` | Agent 离线 | agent_id |
+| `system.startup` | Coordinator 启动 | — |
+| `system.shutdown` | Coordinator 关闭 | — |

@@ -25,6 +25,7 @@ class MessageType(str, Enum):
     NEW_MOTION = "NEW_MOTION"
     REQUEST_SPEAK = "REQUEST_SPEAK"
     SPEAK = "SPEAK"
+    SPEECH_ADDED = "SPEECH_ADDED"
     BROADCAST = "BROADCAST"
     ROUND_COMPLETE = "ROUND_COMPLETE"
     REQUEST_VOTE = "REQUEST_VOTE"
@@ -54,6 +55,14 @@ class MessageType(str, Enum):
     RATE_LIMITED = "RATE_LIMITED"
     RATE_LIMIT_RESET = "RATE_LIMIT_RESET"
     RATE_LIMIT_REPORT = "RATE_LIMIT_REPORT"  # agent → coordinator
+    # Phase 10: parallel execution
+    TASK_STARTED = "TASK_STARTED"         # agent→coordinator: execution begun
+    TASK_BLOCKED = "TASK_BLOCKED"         # coordinator→agent: resource conflict
+    TASK_UNBLOCKED = "TASK_UNBLOCKED"     # coordinator→agent: resource available
+    TASK_RETRY = "TASK_RETRY"             # coordinator→agent: re-execute failed task
+    TASK_PROGRESS = "TASK_PROGRESS"       # agent→coordinator: progress update
+    GRAPH_COMPLETE = "GRAPH_COMPLETE"     # coordinator→all: graph finished
+    GRAPH_ABORTED = "GRAPH_ABORTED"       # coordinator→all: graph aborted
 
 
 class MotionStatus(str, Enum):

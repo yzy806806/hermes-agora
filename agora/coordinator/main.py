@@ -44,6 +44,14 @@ from .rate_limit_router import router as rate_limit_router
 from .rate_limit_router import init_rate_limit_deps
 from .rate_limit_router2 import router as rate_limit_router2
 from .rate_limit_router2 import init_rate_limit_deps2
+# Phase 10 integration imports
+from .rbac_middleware import RBACMiddleware
+from .plugin_discovery import discover_plugins, filter_plugins, validate_manifest
+from .plugin_manager import PluginCoordinator
+from .task_parallel import ParallelExecutionCoordinator
+from .task_resource import FileResourceTracker
+from .token_manager import TokenManager
+from .audit import AuditLogger
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +110,35 @@ async def lifespan(app: FastAPI):
             timeout=settings.heartbeat_timeout_seconds,
         )
     )
+    # Phase 10.2: RBAC — TokenManager + AuditLogger
+    token_mgr = TokenManager(secret=settings.jwt_secret or None)
+    audit_logger = AuditLogger(settings.db_path)
+    app.state.token_mgr = token_mgr
+    app.state.audit_logger = audit_logger
+    # Phase 10.1: Parallel execution coordinator
+    resource_tracker = FileResourceTracker()
+    parallel_coord = ParallelExecutionCoordinator(
+        storage, manager, resource_tracker,
+    )
+    app.state.parallel_coord = parallel_coord
+    app.state.resource_tracker = resource_tracker
+    # Wire app.state into hub for WS route access
+    manager.set_app_state(app.state)
+    # Phase 10.3: Plugin discovery + loading
+    plugin_coord = PluginCoordinator(storage=storage, config=settings)
+    discovered = discover_plugins()
+    filtered = filter_plugins(
+        discovered,
+        enabled=settings.plugins_enabled or None,
+        disabled=settings.plugins_disabled,
+    )
+    for plugin in filtered:
+        if validate_manifest(plugin):
+            await plugin_coord.load_plugin(plugin)
+    app.state.plugin_coord = plugin_coord
+    logger.info(
+        "Plugins loaded: %d/%d", len(plugin_coord.list_plugins()), len(discovered),
+    )
     logger.info("Coordinator started (db=%s)", settings.db_path)
     yield
     # Cleanup
@@ -120,6 +157,11 @@ async def lifespan(app: FastAPI):
             pass
         logger.info("Heartbeat timeout checker stopped")
     await heartbeat_mgr.stop()
+    # Phase 10.3: Unload all plugins on shutdown
+    plugin_coord = getattr(app.state, "plugin_coord", None)
+    if plugin_coord:
+        for name in [p.name for p in plugin_coord.list_plugins()]:
+            await plugin_coord.unload_plugin(name)
     logger.info("Coordinator shutting down")
 
 
@@ -127,7 +169,7 @@ def create_app() -> FastAPI:
     """Factory: create and configure the FastAPI application."""
     app = FastAPI(
         title="Hermes Agora Coordinator",
-        version="0.8.0",
+        version="0.10.0",
         lifespan=lifespan,
     )
     app.add_middleware(
@@ -137,6 +179,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # Phase 10.2: RBAC middleware (active when AGORA_RBAC_ENFORCE=true)
+    app.add_middleware(RBACMiddleware)
 
     @app.middleware("http")
     async def trace_middleware(request: Request, call_next):

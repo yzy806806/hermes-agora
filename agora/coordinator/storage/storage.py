@@ -24,7 +24,10 @@ from . import messages as _messages
 from . import motions as _motions
 from . import tasks as _tasks
 from . import votes as _votes
-from .schema import SCHEMA_SQL, SCHEMA_VERSION, MIGRATION_6_TO_7, MIGRATION_7_TO_8
+from . import parallel as _parallel
+from . import rbac as _rbac
+from . import tokens as _tokens
+from .schema import SCHEMA_SQL, SCHEMA_VERSION, MIGRATION_6_TO_7, MIGRATION_7_TO_8, MIGRATION_8_TO_9
 
 logger = logging.getLogger(__name__)
 
@@ -72,11 +75,23 @@ class Storage:
                     await db.execute(stmt)
                 logger.info("Applied migration 7→8 (Phase 9.4 rate_limit_usage)")
 
+            if current_ver < 9:
+                for stmt in MIGRATION_8_TO_9:
+                    await db.execute(stmt)
+                logger.info(
+                    "Applied migration 8→9 (Phase 10 parallel + RBAC)")
+
             await db.execute(
                 "INSERT OR IGNORE INTO schema_version VALUES (?, ?)",
                 [SCHEMA_VERSION, datetime.now(timezone.utc).isoformat()],
             )
             await db.commit()
+
+            # Seed default RBAC roles if roles table is empty
+            async with db.execute("SELECT COUNT(*) FROM roles") as cur:
+                row = await cur.fetchone()
+            if row and row[0] == 0:
+                await _rbac.seed_default_roles(db)
         logger.info("Database initialized at %s", self.db_path)
 
     # --- Agent CRUD ---
@@ -389,10 +404,18 @@ class Storage:
     # --- Task CRUD (Phase 9) ---
 
     async def create_task_graph(
-        self, graph_id: str, motion_id: str
+        self, graph_id: str, motion_id: str,
+        parallel_mode: str = "auto",
+        max_parallel_slots: int = 10,
+        resource_conflict_policy: str = "warn",
     ) -> dict:
         async with self._connection() as db:
-            return await _tasks.create_task_graph(db, graph_id, motion_id)
+            return await _tasks.create_task_graph(
+                db, graph_id, motion_id,
+                parallel_mode=parallel_mode,
+                max_parallel_slots=max_parallel_slots,
+                resource_conflict_policy=resource_conflict_policy,
+            )
 
     async def get_task_graph(self, graph_id: str) -> Optional[dict]:
         async with self._connection() as db:
@@ -458,3 +481,143 @@ class Storage:
     ) -> list[dict]:
         async with self._connection() as db:
             return await _agent_hb.list_stale_agents(db, timeout_seconds)
+
+    # --- ExecutionSlot CRUD (Phase 10) ---
+
+    async def create_execution_slot(self, slot) -> dict:
+        async with self._connection() as db:
+            return await _parallel.create_execution_slot(db, slot)
+
+    async def get_execution_slots(
+        self, agent_id: str | None = None,
+        status: str | None = None,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _parallel.get_execution_slots(
+                db, agent_id=agent_id, status=status)
+
+    async def update_slot_status(
+        self, task_id: str, status: str,
+    ) -> None:
+        async with self._connection() as db:
+            await _parallel.update_slot_status(db, task_id, status)
+
+    async def delete_execution_slot(self, task_id: str) -> None:
+        async with self._connection() as db:
+            await _parallel.delete_execution_slot(db, task_id)
+
+    # --- ResourceLock CRUD (Phase 10) ---
+
+    async def acquire_resource_lock(self, lock) -> dict:
+        async with self._connection() as db:
+            return await _parallel.acquire_resource_lock(db, lock)
+
+    async def get_resource_lock(
+        self, resource_path: str,
+    ) -> dict | None:
+        async with self._connection() as db:
+            return await _parallel.get_resource_lock(db, resource_path)
+
+    async def get_locks_by_task(self, task_id: str) -> list[dict]:
+        async with self._connection() as db:
+            return await _parallel.get_locks_by_task(db, task_id)
+
+    async def add_waiting_task(
+        self, resource_path: str, task_id: str,
+    ) -> None:
+        async with self._connection() as db:
+            await _parallel.add_waiting_task(db, resource_path, task_id)
+
+    async def release_resource_lock(
+        self, resource_path: str,
+    ) -> None:
+        async with self._connection() as db:
+            await _parallel.release_resource_lock(db, resource_path)
+
+    async def release_all_locks_for_task(
+        self, task_id: str,
+    ) -> None:
+        async with self._connection() as db:
+            await _parallel.release_all_locks_for_task(db, task_id)
+
+    # --- RBAC CRUD (Phase 10.2) ---
+
+    async def get_role(self, name: str) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _rbac.get_role(db, name)
+
+    async def list_roles(self) -> list[dict]:
+        async with self._connection() as db:
+            return await _rbac.list_roles(db)
+
+    async def create_rbac_token(
+        self, principal_id: str, role: str, token_hash: str,
+        token_id: str, scopes: list[str] | None = None,
+        expires_at: Optional[str] = None, tenant_id: str = "default",
+    ) -> dict:
+        async with self._connection() as db:
+            return await _rbac.create_token(
+                db, principal_id, role, token_hash, token_id,
+                scopes=scopes, expires_at=expires_at,
+                tenant_id=tenant_id)
+
+    async def get_rbac_token_by_hash(self, token_hash: str) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _rbac.get_token_by_hash(db, token_hash)
+
+    async def revoke_rbac_token(self, token_id: int) -> None:
+        async with self._connection() as db:
+            await _rbac.revoke_token(db, token_id)
+
+    async def log_audit(
+        self, event_type: str, actor_id: str, action: str,
+        resource: Optional[str] = None, actor_role: Optional[str] = None,
+        details: Optional[dict] = None, tenant_id: str = "default",
+    ) -> int:
+        async with self._connection() as db:
+            return await _rbac.log_audit(
+                db, event_type, actor_id, action,
+                resource=resource, actor_role=actor_role,
+                details=details, tenant_id=tenant_id)
+
+    async def query_audit(
+        self, tenant_id: str = "default",
+        actor_id: Optional[str] = None,
+        event_type: Optional[str] = None, limit: int = 100,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _rbac.query_audit(
+                db, tenant_id=tenant_id, actor_id=actor_id,
+                event_type=event_type, limit=limit)
+
+    # --- Token CRUD (Phase 10.2c) ---
+
+    async def save_token(
+        self, token_id: str, token_hash: str,
+        principal_id: str, role: str,
+        scopes: list[str] | None = None,
+        tenant_id: str = "default",
+        expires_at: Optional[str] = None,
+    ) -> dict:
+        async with self._connection() as db:
+            return await _tokens.save_token(
+                db, token_id, token_hash, principal_id, role,
+                scopes=scopes, tenant_id=tenant_id,
+                expires_at=expires_at)
+
+    async def get_token(self, token_id: str) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _tokens.get_token(db, token_id)
+
+    async def revoke_token(self, token_id: str) -> bool:
+        async with self._connection() as db:
+            return await _tokens.revoke_token(db, token_id)
+
+    async def list_tokens(
+        self, principal_id: Optional[str] = None,
+        include_revoked: bool = False,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _tokens.list_tokens(
+                db, principal_id=principal_id,
+                include_revoked=include_revoked)

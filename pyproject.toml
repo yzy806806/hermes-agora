@@ -1,6 +1,6 @@
 [project]
 name = "agora"
-version = "0.9.4"
+version = "0.10.0"
 description = "Multi-Agent Deliberation Platform"
 readme = "README.md"
 license = {text = "MIT"}
@@ -16,6 +16,8 @@ dependencies = [
     "aiohttp>=3.9",
     "prometheus-client>=0.20",
     "pyyaml>=6.0",
+    "pyjwt>=2.8",
+    "packaging>=24.0",
 ]
 
 [project.optional-dependencies]

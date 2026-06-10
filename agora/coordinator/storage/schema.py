@@ -1,6 +1,6 @@
 """SQL schema definitions for the Agora Coordinator database."""
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 SCHEMA_SQL = """\
 PRAGMA foreign_keys = ON;
@@ -185,6 +185,9 @@ CREATE TABLE IF NOT EXISTS task_graphs (
     id TEXT PRIMARY KEY,
     motion_id TEXT NOT NULL UNIQUE,
     created_at TEXT NOT NULL,
+    parallel_mode TEXT DEFAULT 'auto',
+    max_parallel_slots INTEGER DEFAULT 10,
+    resource_conflict_policy TEXT DEFAULT 'warn',
     FOREIGN KEY (motion_id) REFERENCES motions(id) ON DELETE CASCADE
 );
 
@@ -225,9 +228,77 @@ CREATE TABLE IF NOT EXISTS rate_limit_usage (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rate_limit_agent ON rate_limit_usage(agent_id);
-"""
 
-# Phase 9.3: Agent model migration (schema version 6 → 7)
+-- Phase 10: Parallel execution tables
+
+CREATE TABLE IF NOT EXISTS execution_slots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'running',
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    FOREIGN KEY (agent_id) REFERENCES agents(agent_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_exec_slots_task ON execution_slots(task_id);
+CREATE INDEX IF NOT EXISTS idx_exec_slots_agent ON execution_slots(agent_id);
+CREATE INDEX IF NOT EXISTS idx_exec_slots_status ON execution_slots(status);
+
+CREATE TABLE IF NOT EXISTS resource_locks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    resource_path TEXT NOT NULL,
+    locked_by TEXT NOT NULL,
+    waiting_tasks TEXT NOT NULL DEFAULT '[]',
+    lock_type TEXT NOT NULL DEFAULT 'write',
+    acquired_at TEXT NOT NULL,
+    FOREIGN KEY (locked_by) REFERENCES tasks(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_resource_locks_path ON resource_locks(resource_path);
+CREATE INDEX IF NOT EXISTS idx_rate_limit_agent ON rate_limit_usage(agent_id);
+
+-- Phase 10.2: RBAC tables
+
+CREATE TABLE IF NOT EXISTS roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    permissions_json TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_id TEXT NOT NULL UNIQUE,
+    token_hash TEXT NOT NULL UNIQUE,
+    principal_id TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'agent',
+    scopes TEXT NOT NULL DEFAULT '[]',
+    tenant_id TEXT DEFAULT 'default',
+    expires_at TEXT,
+    is_revoked INTEGER DEFAULT 0,
+    revoked_at TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    actor_id TEXT NOT NULL,
+    actor_role TEXT,
+    action TEXT NOT NULL,
+    resource TEXT,
+    details_json TEXT,
+    timestamp TEXT NOT NULL,
+    tenant_id TEXT DEFAULT 'default'
+);
+
+CREATE INDEX IF NOT EXISTS idx_tokens_principal ON tokens(principal_id);
+CREATE INDEX IF NOT EXISTS idx_tokens_hash ON tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(tenant_id, actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_log(tenant_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_audit_event ON audit_log(event_type);
+"""
 MIGRATION_6_TO_7 = [
     "ALTER TABLE agents ADD COLUMN agent_type TEXT DEFAULT 'hermes';",
     "ALTER TABLE agents ADD COLUMN max_concurrent_tasks INTEGER DEFAULT 2;",
@@ -253,3 +324,85 @@ MIGRATION_7_TO_8 = [
     "ALTER TABLE agents ADD COLUMN tpm_limit INTEGER DEFAULT 10000;",
     "ALTER TABLE agents ADD COLUMN tpm_burst_factor REAL DEFAULT 1.5;",
 ]
+
+# Phase 10: Parallel execution tables + task_graphs parallel columns (8 → 9)
+MIGRATION_8_TO_9 = [
+    """CREATE TABLE IF NOT EXISTS execution_slots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'running',
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    FOREIGN KEY (agent_id) REFERENCES agents(agent_id)
+);""",
+    "CREATE INDEX IF NOT EXISTS idx_exec_slots_task ON execution_slots(task_id);",
+    "CREATE INDEX IF NOT EXISTS idx_exec_slots_agent ON execution_slots(agent_id);",
+    "CREATE INDEX IF NOT EXISTS idx_exec_slots_status ON execution_slots(status);",
+    """CREATE TABLE IF NOT EXISTS resource_locks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    resource_path TEXT NOT NULL,
+    locked_by TEXT NOT NULL,
+    waiting_tasks TEXT NOT NULL DEFAULT '[]',
+    lock_type TEXT NOT NULL DEFAULT 'write',
+    acquired_at TEXT NOT NULL,
+    FOREIGN KEY (locked_by) REFERENCES tasks(id) ON DELETE CASCADE
+);""",
+    "CREATE INDEX IF NOT EXISTS idx_resource_locks_path ON resource_locks(resource_path);",
+    "CREATE INDEX IF NOT EXISTS idx_resource_locks_task ON resource_locks(locked_by);",
+    "ALTER TABLE task_graphs ADD COLUMN parallel_mode TEXT DEFAULT 'auto';",
+    "ALTER TABLE task_graphs ADD COLUMN max_parallel_slots INTEGER DEFAULT 10;",
+    "ALTER TABLE task_graphs ADD COLUMN resource_conflict_policy TEXT DEFAULT 'warn';",
+    # Phase 10.2: RBAC tables
+    """CREATE TABLE IF NOT EXISTS roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    permissions_json TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
+);""",
+    """CREATE TABLE IF NOT EXISTS tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_id TEXT NOT NULL UNIQUE,
+    token_hash TEXT NOT NULL UNIQUE,
+    principal_id TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'agent',
+    scopes TEXT NOT NULL DEFAULT '[]',
+    tenant_id TEXT DEFAULT 'default',
+    expires_at TEXT,
+    is_revoked INTEGER DEFAULT 0,
+    revoked_at TEXT,
+    created_at TEXT NOT NULL
+);""",
+    """CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    actor_id TEXT NOT NULL,
+    actor_role TEXT,
+    action TEXT NOT NULL,
+    resource TEXT,
+    details_json TEXT,
+    timestamp TEXT NOT NULL,
+    tenant_id TEXT DEFAULT 'default'
+);""",
+    "CREATE INDEX IF NOT EXISTS idx_tokens_principal ON tokens(principal_id);",
+    "CREATE INDEX IF NOT EXISTS idx_tokens_hash ON tokens(token_hash);",
+    "CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(tenant_id, actor_id);",
+    "CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_log(tenant_id, timestamp);",
+    "CREATE INDEX IF NOT EXISTS idx_audit_event ON audit_log(event_type);",
+]
+
+# Default RBAC roles to seed on fresh DB
+DEFAULT_ROLES = {
+    "admin": [
+        "agent:approve", "agent:config", "agent:delete",
+        "discussion:moderate", "task:view", "task:assign",
+        "tenant:manage", "system:metrics", "system:config",
+    ],
+    "agent": [
+        "agent:register", "discussion:create", "discussion:view",
+        "task:view", "task:execute", "system:metrics",
+    ],
+    "observer": [
+        "discussion:view", "task:view", "system:metrics",
+    ],
+}

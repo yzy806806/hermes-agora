@@ -16,7 +16,7 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
     "running": {"done", "failed"},
     "done": {"accepted", "rejected"},
     "rejected": {"pending"},
-    "failed": set(),   # terminal
+    "failed": {"pending"},  # Phase 10.1e: retry resets to pending
     "accepted": set(), # terminal
 }
 
@@ -41,12 +41,13 @@ async def handle_task_status(
     payload: dict,
     storage: Any,
     hub: Any,
+    parallel_coord: Any | None = None,
 ) -> None:
     """Process TASK_STATUS from an agent.
 
     Validates the transition, updates DB, and triggers next steps:
-    - RUNNING -> DONE: trigger verification
-    - -> FAILED: log error event
+    - RUNNING -> DONE: trigger verification + parallel resource release
+    - -> FAILED: log error event + parallel failure cascade
     """
     task_id = payload.get("task_id")
     new_status = payload.get("status") or ""
@@ -71,6 +72,9 @@ async def handle_task_status(
     if new_status == "done":
         from .task_verify import verify_task
         await verify_task(task_id, storage, hub)
+        if parallel_coord:
+            await _parallel_on_done(
+                task_id, task, parallel_coord, storage, hub)
     if new_status == "failed":
         await storage.log_event(
             "task.failed",
@@ -78,3 +82,105 @@ async def handle_task_status(
             motion_id=task["motion_id"],
             agent_id=agent_id,
         )
+        if parallel_coord:
+            await _parallel_on_fail(
+                task_id, task, parallel_coord, storage, hub)
+
+
+async def handle_task_started(
+    agent_id: str, payload: dict, storage: Any, hub: Any,
+    parallel_coord: Any | None = None,
+) -> None:
+    """Process TASK_STARTED: agent confirms execution has begun."""
+    task_id = payload.get("task_id")
+    if not task_id:
+        await _send_error(hub, agent_id, "missing_task_id", "Missing task_id")
+        return
+    task = await storage.get_task(task_id)
+    if not task:
+        await _send_error(hub, agent_id, "task_not_found", f"Task {task_id} not found")
+        return
+    await storage.update_task_status(task_id, "running")
+    await storage.log_event(
+        "task.started", f"Task {task_id} started by {agent_id}",
+        motion_id=task["motion_id"], agent_id=agent_id,
+    )
+    # Track slot in parallel coordinator if active
+    if parallel_coord and task_id in parallel_coord._running_futures:
+        parallel_coord.agent_slots[agent_id] = (
+            parallel_coord.agent_slots.get(agent_id, 0) - 1)
+    logger.info("Task %s started by agent %s", task_id, agent_id)
+
+
+async def handle_task_progress(
+    agent_id: str, payload: dict, storage: Any, hub: Any,
+) -> None:
+    """Process TASK_PROGRESS: optional progress update from agent."""
+    task_id = payload.get("task_id")
+    if not task_id:
+        await _send_error(hub, agent_id, "missing_task_id", "Missing task_id")
+        return
+    progress_pct = payload.get("progress_pct", 0)
+    message = payload.get("message", "")
+    await storage.log_event(
+        "task.progress",
+        f"Task {task_id}: {progress_pct}% — {message}",
+        agent_id=agent_id,
+    )
+    logger.info("Task %s progress: %s%% — %s", task_id, progress_pct, message)
+
+
+async def _parallel_on_done(
+    task_id: str, task: dict, coord: Any, storage: Any, hub: Any,
+) -> None:
+    """Release resources and free agent slot on task completion."""
+    from .task_parallel_events import on_task_complete
+    from .task_parallel_helpers import priority_value
+    await on_task_complete(
+        task_id, coord._graph_tasks, coord._completed,
+        coord._failed, coord._result, coord.agent_slots,
+        coord.resource_tracker, coord.runqueue,
+    )
+    # Re-dispatch any newly-ready tasks
+    from .task_parallel_dispatch import dispatch_ready
+    await dispatch_ready(
+        coord._graph_tasks, coord.runqueue, storage, hub,
+        coord.agent_slots, coord.resource_tracker,
+        coord._result, coord._running_futures,
+    )
+    logger.info("Parallel: task %s done, resources released", task_id)
+
+
+async def _parallel_on_fail(
+    task_id: str, task: dict, coord: Any, storage: Any, hub: Any,
+) -> None:
+    """Cascade failure to dependents and release agent slot."""
+    from .task_parallel_events import on_task_failed
+    await on_task_failed(
+        task_id, f"Task {task_id} failed", coord._graph_tasks,
+        coord._failed, coord._result, coord.agent_slots,
+        coord.resource_tracker,
+    )
+    logger.warning("Parallel: task %s failed, cascading", task_id)
+
+
+async def execute_task_graph(
+    graph: Any, storage: Any, hub: Any,
+    parallel_coord: Any | None = None,
+) -> dict[str, str]:
+    """Execute a task graph, delegating to parallel coordinator when needed.
+
+    Phase 10.4a integration: when parallel_mode != 'sequential' and a
+    ParallelExecutionCoordinator is available, use it for execution.
+    Otherwise, fall back to sequential assignment (Phase 9 behavior).
+    """
+    mode = getattr(graph, "parallel_mode", "auto")
+    if parallel_coord and mode != "sequential":
+        logger.info(
+            "Executing graph %s via parallel coordinator (mode=%s)",
+            graph.id, mode,
+        )
+        return await parallel_coord.execute_graph(graph)
+    # Sequential fallback (Phase 9 behavior)
+    from .task_assign import assign_tasks
+    return await assign_tasks(graph, storage, hub)

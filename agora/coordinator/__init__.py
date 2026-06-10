@@ -6,4 +6,4 @@ discussions, voting, and agent coordination.
 
 from __future__ import annotations
 
-__version__ = "0.9.4"
+__version__ = "0.10.0"

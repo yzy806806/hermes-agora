@@ -26,10 +26,15 @@ class ConnectionHub:
         self.active_connections: dict[str, WebSocket] = {}
         self._storage: Optional[Storage] = None
         self._state_machine: Optional[StateMachine] = None
+        self._app_state: Any = None
 
     def set_deps(self, storage: Storage, sm: StateMachine) -> None:
         self._storage = storage
         self._state_machine = sm
+
+    def set_app_state(self, app_state: Any) -> None:
+        """Store FastAPI app.state for accessing shared components."""
+        self._app_state = app_state
 
     async def connect(self, agent_id: str, websocket: WebSocket) -> bool:
         """Accept WS and mark agent online. Returns False if not registered."""
@@ -110,6 +115,12 @@ class ConnectionManager:
         hub = self.get_hub(tenant_id)
         hub.set_deps(storage, sm)
 
+    def set_app_state(self, app_state: Any) -> None:
+        """Set app.state on all hubs for shared component access."""
+        self._default_hub.set_app_state(app_state)
+        for hub in self._hubs.values():
+            hub.set_app_state(app_state)
+
     # Backward-compat proxies to default hub
     @property
     def active_connections(self) -> dict[str, WebSocket]:
@@ -122,6 +133,10 @@ class ConnectionManager:
     @property
     def _state_machine(self) -> Optional[StateMachine]:
         return self._default_hub._state_machine
+
+    @property
+    def _app_state(self) -> Any:
+        return self._default_hub._app_state
 
     async def connect(self, agent_id: str, websocket: WebSocket) -> bool:
         return await self._default_hub.connect(agent_id, websocket)

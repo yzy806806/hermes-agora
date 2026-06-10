@@ -58,9 +58,9 @@ class TestInputValidator:
 
     def test_validate_vote_payload_valid(self):
         for choice in ("for", "against", "abstain"):
-            p = self.validator.validate_vote_payload({"choice": choice})
-            assert p["choice"] == choice
+            p = self.validator.validate_vote_payload({"vote": choice})
+            assert p["vote"] == choice
 
     def test_validate_vote_payload_invalid(self):
         with pytest.raises(ValueError, match="Invalid vote"):
-            self.validator.validate_vote_payload({"choice": "maybe"})
+            self.validator.validate_vote_payload({"vote": "maybe"})

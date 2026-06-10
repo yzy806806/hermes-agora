@@ -74,6 +74,11 @@ async def get_agent(
         # Normalize is_approved from DB int (0/1) to Python bool
         if "is_approved" in d and isinstance(d["is_approved"], int):
             d["is_approved"] = bool(d["is_approved"])
+        # Deserialize JSON fields (capabilities, active_tasks)
+        if "capabilities" in d and isinstance(d["capabilities"], str):
+            d["capabilities"] = json.loads(d["capabilities"])
+        if "active_tasks" in d and isinstance(d["active_tasks"], str):
+            d["active_tasks"] = json.loads(d["active_tasks"])
         return d
 
 
@@ -85,7 +90,16 @@ async def get_agent_by_token(
         "SELECT * FROM agents WHERE agent_token = ?", [token]
     ) as cursor:
         row = await cursor.fetchone()
-        return dict(row) if row else None
+        if not row:
+            return None
+        d = dict(row)
+        if "is_approved" in d and isinstance(d["is_approved"], int):
+            d["is_approved"] = bool(d["is_approved"])
+        if "capabilities" in d and isinstance(d["capabilities"], str):
+            d["capabilities"] = json.loads(d["capabilities"])
+        if "active_tasks" in d and isinstance(d["active_tasks"], str):
+            d["active_tasks"] = json.loads(d["active_tasks"])
+        return d
 
 
 async def list_agents(
@@ -97,7 +111,15 @@ async def list_agents(
     if online_only:
         query += " WHERE is_online = 1"
     async with db.execute(query, params) as cursor:
-        return [dict(row) async for row in cursor]
+        rows = [dict(row) async for row in cursor]
+    for d in rows:
+        if "is_approved" in d and isinstance(d["is_approved"], int):
+            d["is_approved"] = bool(d["is_approved"])
+        if "capabilities" in d and isinstance(d["capabilities"], str):
+            d["capabilities"] = json.loads(d["capabilities"])
+        if "active_tasks" in d and isinstance(d["active_tasks"], str):
+            d["active_tasks"] = json.loads(d["active_tasks"])
+    return rows
 
 
 async def set_agent_online(
@@ -115,7 +137,15 @@ async def set_agent_online(
 async def deregister_agent(
     db: aiosqlite.Connection, agent_id: str
 ) -> None:
-    """Remove an agent from the system."""
+    """Remove an agent from the system.
+
+    Cleans up dependent rate_limit_usage rows before deleting
+    to avoid FOREIGN KEY constraint failures.
+    """
+    await db.execute(
+        "DELETE FROM rate_limit_usage WHERE agent_id = ?",
+        [agent_id],
+    )
     await db.execute(
         "DELETE FROM agents WHERE agent_id = ?", [agent_id]
     )

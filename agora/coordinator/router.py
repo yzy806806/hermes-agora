@@ -11,7 +11,7 @@ import secrets
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import Response
 
 from .config import settings
@@ -29,6 +29,7 @@ from .models import (
     MotionStatus,
     VotingMethod,
 )
+from .rbac import Permission, Role, get_current_role, requires
 from .state import InvalidTransitionError, StateMachine
 from .storage import Storage
 from .ws import manager
@@ -96,7 +97,11 @@ async def metrics_endpoint() -> Response:
 
 @router.post("/agents/register", response_model=AgentRegistrationResponse,
              status_code=201)
-async def register_agent(request: AgentRegisterRequest) -> AgentRegistrationResponse:
+@requires(Permission.AGENT_REGISTER)
+async def register_agent(
+    request: AgentRegisterRequest,
+    _rbac_role: Role | None = Depends(get_current_role),
+) -> AgentRegistrationResponse:
     """Register a new agent. Returns agent_token for WS auth.
 
     If AGORA_REQUIRE_APPROVAL=true: agent is PENDING until admin approves.
@@ -140,7 +145,11 @@ async def register_agent(request: AgentRegisterRequest) -> AgentRegistrationResp
 
 
 @router.delete("/agents/{agent_id}")
-async def deregister_agent(agent_id: str) -> dict:
+@requires(Permission.ADMIN_FULL)
+async def deregister_agent(
+    agent_id: str,
+    _rbac_role: Role | None = Depends(get_current_role),
+) -> dict:
     """Deregister an agent from the system."""
     storage = _get_storage()
     agent = await storage.get_agent(agent_id)
@@ -164,7 +173,11 @@ async def list_agents() -> list[AgentInfo]:
 
 
 @router.get("/admin/agents", response_model=list[AgentInfo])
-async def admin_list_agents(authorization: str = Header("")) -> list[AgentInfo]:
+@requires(Permission.ADMIN_FULL)
+async def admin_list_agents(
+    authorization: str = Header(""),
+    _rbac_role: Role | None = Depends(get_current_role),
+) -> list[AgentInfo]:
     """List all agents including approval status. Admin only."""
     _require_admin(authorization)
     storage = _get_storage()
@@ -173,8 +186,11 @@ async def admin_list_agents(authorization: str = Header("")) -> list[AgentInfo]:
 
 
 @router.post("/admin/agents/{agent_id}/approve")
+@requires(Permission.AGENT_APPROVE)
 async def admin_approve_agent(
-    agent_id: str, authorization: str = Header(""),
+    agent_id: str,
+    authorization: str = Header(""),
+    _rbac_role: Role | None = Depends(get_current_role),
 ) -> dict:
     """Approve a pending agent. Admin only."""
     _require_admin(authorization)
@@ -187,8 +203,11 @@ async def admin_approve_agent(
 
 
 @router.post("/admin/agents/{agent_id}/reject")
+@requires(Permission.ADMIN_FULL)
 async def admin_reject_agent(
-    agent_id: str, authorization: str = Header(""),
+    agent_id: str,
+    authorization: str = Header(""),
+    _rbac_role: Role | None = Depends(get_current_role),
 ) -> dict:
     """Reject a pending agent. Admin only."""
     _require_admin(authorization)
@@ -201,8 +220,11 @@ async def admin_reject_agent(
 
 
 @router.post("/admin/agents/{agent_id}/suspend")
+@requires(Permission.ADMIN_FULL)
 async def admin_suspend_agent(
-    agent_id: str, authorization: str = Header(""),
+    agent_id: str,
+    authorization: str = Header(""),
+    _rbac_role: Role | None = Depends(get_current_role),
 ) -> dict:
     """Suspend a previously approved agent. Admin only."""
     _require_admin(authorization)
@@ -220,7 +242,11 @@ async def admin_suspend_agent(
 
 
 @router.post("/motions", response_model=Motion)
-async def create_motion(request: MotionCreateRequest) -> Motion:
+@requires(Permission.DISCUSSION_CREATE)
+async def create_motion(
+    request: MotionCreateRequest,
+    _rbac_role: Role | None = Depends(get_current_role),
+) -> Motion:
     """Create a new motion (topic for discussion)."""
     storage = _get_storage()
     data = await storage.create_motion(
@@ -269,7 +295,11 @@ async def get_motion(motion_id: str) -> Motion:
 
 
 @router.post("/motions/{motion_id}/start")
-async def start_motion(motion_id: str) -> dict:
+@requires(Permission.DISCUSSION_CREATE)
+async def start_motion(
+    motion_id: str,
+    _rbac_role: Role | None = Depends(get_current_role),
+) -> dict:
     """Start discussion on a draft motion."""
     sm = _get_sm()
     storage = _get_storage()
@@ -362,7 +392,11 @@ async def get_assessment(motion_id: str) -> AssessmentResponse:
 
 
 @router.post("/motions/{motion_id}/force-vote")
-async def force_vote(motion_id: str) -> dict:
+@requires(Permission.DISCUSSION_VOTE)
+async def force_vote(
+    motion_id: str,
+    _rbac_role: Role | None = Depends(get_current_role),
+) -> dict:
     """Force a motion into voting phase regardless of round progress."""
     sm = _get_sm()
     storage = _get_storage()

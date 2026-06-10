@@ -1,6 +1,6 @@
 # Agora 架构文档
 
-> 版本: v0.9.3 | 最后更新: 2026-06-10
+> 版本: v0.10.0 | 最后更新: 2026-06-10
 
 ## 整体架构
 
@@ -27,6 +27,15 @@
                     │  ┌───────────┐ ┌───────────────┐  │
                     │  │ Observ-   │ │ Tenant        │  │
                     │  │ ability   │ │ Manager       │  │
+                    │  └───────────┘ └───────────────┘  │
+                    │  ┌───────────┐ ┌───────────────┐  │
+                    │  │ Parallel  │ │ RBAC          │  │
+                    │  │ Task      │ │ Middleware    │  │
+                    │  │ Coordinator│ │ + TokenMgr   │  │
+                    │  └───────────┘ └───────────────┘  │
+                    │  ┌───────────┐ ┌───────────────┐  │
+                    │  │ Plugin    │ │ Resource      │  │
+                    │  │ Manager   │ │ Tracker       │  │
                     │  └───────────┘ └───────────────┘  │
                     │  ┌───────────┐ ┌───────────────┐  │
                     │  │ Task      │ │ Agent         │  │
@@ -128,6 +137,16 @@ agora/
 │   │   │   ├── auto_check.py   # 自动检查
 │   │   │   ├── accept_result.py # 接受结果
 │   │   │   └── delegate.py   # 委托审查
+│   │   ├── task_parallel.py # 并行执行协调器 (Phase 10.1)
+│   │   ├── task_resource.py # 文件资源冲突检测 (Phase 10.1)
+│   │   ├── rbac.py          # RBAC 中间件 + 权限检查 (Phase 10.2)
+│   │   ├── token_manager.py # JWT Token 管理 (Phase 10.2)
+│   │   ├── audit.py         # 审计日志 (Phase 10.2)
+│   │   ├── plugin.py        # 插件基类 + HookPoint (Phase 10.3)
+│   │   ├── plugin_manager.py # 插件协调器 (Phase 10.3)
+│   │   ├── plugin_discovery.py # 插件发现 (Phase 10.3)
+│   │   ├── plugin_sandbox.py # 插件沙箱 (Phase 10.3)
+│   │   ├── plugin_extensions.py # 扩展点注册 (Phase 10.3)
 │   │   ├── voting/          # 投票子系统
 │   │   │   ├── __init__.py
 │   │   │   ├── factory.py   # 投票策略工厂
@@ -206,7 +225,10 @@ agora/
 | 9.1 | 平台独立化 | cli, pyproject.toml, Dockerfile, config.yaml, config_loader | `agora/` 包结构、pip 安装、Docker 部署 |
 | 9.2 | 任务执行引擎 | task_models, task_gen/*, task_assign, task_exec, task_verify/* | 讨论→TaskGraph→分配→执行→验证 |
 | 9.3 | Agent 注册协议 | AgentType/AgentStatus/AgentConfig 模型, token 认证, HEARTBEAT + capability | 标准化注册、审批、心跳、能力声明 |
-| 9.4 | API 速率限制 | TokenBucket, TokenRateLimiter, RateLimitTracker, ws_rate_limit | per-agent TPM 令牌桶限速 |
+|| 9.4 | API 速率限制 | TokenBucket, TokenRateLimiter, RateLimitTracker, ws_rate_limit | per-agent TPM 令牌桶限速 ||
+|| 10.1 | 并行任务执行 | task_parallel, task_resource, ExecutionSlot, ResourceLock | DAG 依赖并行执行 + 文件资源冲突检测 ||
+|| 10.2 | RBAC 权限控制 | rbac, token_manager, audit, Role, Permission, @requires | 角色权限 + JWT Token + 审计日志 ||
+|| 10.3 | 插件生态 | plugin, plugin_manager, plugin_discovery, plugin_sandbox, plugin_extensions | Hook 系统 + 入口点发现 + 沙箱隔离 ||
 
 ## 模块关系图
 
@@ -304,6 +326,9 @@ draft ──(start)──→ discussing ──(start_voting)──→ voting ─
 10. **任务执行引擎**：讨论关闭后自动生成 TaskGraph (DAG)，按能力匹配分配 agent，通过 WS 消息驱动任务生命周期
 11. **Agent 认证协议**：Token 认证（POST /register 获取 agent_token → WS 连接携带 token 验证），支持审批流（pending/approved）
 12. **Token Bucket 限速**：per-agent TPM 令牌桶，支持 burst（默认 1.5x），coordinator 跟踪 + client 本地预检双重保障
+13. **并行任务执行**：ParallelExecutionCoordinator 从 runqueue 分配任务，尊重 DAG 依赖和 per-agent 执行槽位上限，FileResourceTracker 检测文件级冲突并序列化
+14. **RBAC 权限控制**：五角色体系（SUPERADMIN/ADMIN/AGENT/OBSERVER/PLUGIN）+ 15 细粒度权限，@requires 装饰器绑定端点，JWT Token 支持创建/轮换/撤销/作用域限定，审计日志追踪所有安全事件
+15. **插件生态**：HookPoint 定义 20+ 生命周期事件（discussion/task/agent/system），AgoraPlugin ABC + PluginManifest，入口点发现（pip install），PluginCoordinator 管理加载/卸载/hook 触发，PluginSandbox 提供超时+导入限制
 
 ## Phase 9.1: 平台独立化
 
@@ -470,3 +495,64 @@ data/
 
 所有不带 `tenant_id` 的端点默认使用 `"default"` 租户，
 WebSocket 通过 `?tenant_id=` 参数隔离连接。
+
+## Phase 10.1: 并行任务执行
+
+### 核心组件
+
+- **ParallelExecutionCoordinator** (`task_parallel.py`): 维护 runqueue，追踪 per-agent 执行槽位，动态分配任务
+- **FileResourceTracker** (`task_resource.py`): 检测文件级资源冲突，支持读写锁（多读者单写者）
+
+### 数据模型
+
+- **ExecutionSlot**: 追踪并发执行槽位（task_id, agent_id, started_at, status）
+- **ResourceLock**: 文件资源锁（resource_path, locked_by, waiting_tasks, lock_type）
+- **TaskGraph** 新增: parallel_mode (auto/sequential/parallel), max_parallel_slots, resource_conflict_policy
+
+### 执行流程
+
+1. 讨论关闭 → TaskGraph 生成（现有流程）
+2. ParallelExecutionCoordinator 加载 graph，解析依赖
+3. 识别就绪任务（依赖已满足）→ 检查 agent 槽位 + 资源冲突
+4. 分配任务 → 等待完成事件 → 释放资源 → 重新评估就绪状态
+5. 失败处理：隔离失败，独立任务继续，可配置重试策略
+
+## Phase 10.2: RBAC 权限控制
+
+### 角色体系
+
+| 角色 | 权限范围 |
+|------|---------|
+| SUPERADMIN | 全部权限 |
+| ADMIN | agent 审批/配置/删除, 讨论 mod, 任务查看/分配, 租户管理, 系统配置/指标 |
+| AGENT | 注册, 创建/查看讨论, 查看/执行任务, 系统指标 |
+| OBSERVER | 查看讨论, 查看任务, 系统指标 |
+| PLUGIN | 插件系统 API |
+
+### Token 管理
+
+- JWT Token 支持创建（指定角色+可选权限子集）、验证、轮换、撤销
+- TokenScope 可限定：permissions 子集、tenant_id、过期时间、最大使用次数、来源 IP
+- 向后兼容：无 RBAC 配置时所有 token 授予 AGENT 角色；`AGORA_ADMIN_TOKEN` 映射为 SUPERADMIN
+
+### 审计日志
+
+所有安全相关事件记录到 `audit_log` 表，支持按 principal_id、action、时间范围查询。
+
+## Phase 10.3: 插件生态
+
+### Hook 系统
+
+20+ HookPoint 覆盖：discussion.created/started/closed, round.started/completed, vote.cast/finalized, task.created/assigned/started/completed/failed/verified, graph.completed, agent.registered/approved/online/offline, system.startup/shutdown
+
+### 插件生命周期
+
+1. 启动时 `discover_plugins()` 扫描 `agora.plugins` 入口点
+2. 验证 PluginManifest（版本、依赖）
+3. 调用 `on_load(coordinator)` 注册 hooks
+4. 运行时 `fire_hook(hook, ctx)` 触发已注册的插件处理器
+5. 关闭时调用 `on_unload()` 清理资源
+
+### 扩展点
+
+插件可注册：自定义投票方法、自定义任务验证器、自定义 REST API 端点、自定义讨论策略

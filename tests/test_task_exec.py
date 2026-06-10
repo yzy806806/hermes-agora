@@ -18,14 +18,17 @@ def test_all_valid_transitions():
         ("assigned", "failed"), ("running", "done"),
         ("running", "failed"), ("done", "accepted"),
         ("done", "rejected"), ("rejected", "pending"),
+        ("failed", "pending"),
     ]
     for cur, nxt in ok:
         assert _is_valid_transition(cur, nxt), f"{cur}->{nxt} should be valid"
 
 def test_terminal_states_no_transitions():
-    for terminal in ("failed", "accepted"):
-        assert VALID_TRANSITIONS[terminal] == set()
-        assert not _is_valid_transition(terminal, "pending")
+    """Only 'accepted' is a true terminal state."""
+    assert VALID_TRANSITIONS["accepted"] == set()
+    assert not _is_valid_transition("accepted", "pending")
+    # 'failed' can transition to 'pending' (Phase 10.1e retry path)
+    assert "pending" in VALID_TRANSITIONS["failed"]
 
 def test_invalid_transitions():
     bad = [

@@ -15,16 +15,29 @@ logger = logging.getLogger(__name__)
 
 
 async def create_task_graph(
-    db: aiosqlite.Connection, graph_id: str, motion_id: str
+    db: aiosqlite.Connection, graph_id: str, motion_id: str,
+    parallel_mode: str = "auto",
+    max_parallel_slots: int = 10,
+    resource_conflict_policy: str = "warn",
 ) -> dict:
     """Insert a new TaskGraph row."""
     now = datetime.now(timezone.utc).isoformat()
     await db.execute(
-        "INSERT INTO task_graphs (id, motion_id, created_at) VALUES (?, ?, ?)",
-        [graph_id, motion_id, now],
+        """INSERT INTO task_graphs
+        (id, motion_id, created_at, parallel_mode,
+         max_parallel_slots, resource_conflict_policy)
+        VALUES (?, ?, ?, ?, ?, ?)""",
+        [graph_id, motion_id, now,
+         parallel_mode, max_parallel_slots,
+         resource_conflict_policy],
     )
     await db.commit()
-    return {"id": graph_id, "motion_id": motion_id, "created_at": now}
+    return {
+        "id": graph_id, "motion_id": motion_id,
+        "created_at": now, "parallel_mode": parallel_mode,
+        "max_parallel_slots": max_parallel_slots,
+        "resource_conflict_policy": resource_conflict_policy,
+    }
 
 
 async def get_task_graph(

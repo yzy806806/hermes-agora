@@ -145,3 +145,43 @@ async def assign_tasks(
         remaining = [t for t in remaining if t not in ready]
 
     return assignments
+
+
+async def reassign_task(
+    task_id: str, storage: Any, hub: Any,
+    agent_slots: dict[str, int] | None = None,
+) -> str | None:
+    """Re-assign a task to a different agent (dynamic re-assignment).
+
+    Used when an agent finishes early or goes offline, allowing
+    the task to be picked up by another available agent.
+    Returns the new agent_id or None if no agent available.
+    """
+    task = await storage.get_task(task_id)
+    if not task:
+        logger.warning("Reassign: task %s not found", task_id)
+        return None
+    old_agent = task.get("assigned_to")
+    candidates = await _find_capable_agents(
+        task.get("required_capabilities", []), storage, hub,
+    )
+    if agent_slots is None:
+        agent_slots = {}
+    rr_index = [0]
+    picked = _round_robin_pick(candidates, agent_slots, {}, rr_index)
+    if picked is None or picked == old_agent:
+        return None
+    await storage.update_task_status(
+        task_id, TaskStatus.ASSIGNED.value, assigned_to=picked,
+    )
+    node = TaskNode(
+        id=task_id, graph_id=task.get("graph_id", ""),
+        motion_id=task.get("motion_id", ""),
+        title=task.get("title", ""),
+        description=task.get("description", ""),
+        required_capabilities=task.get("required_capabilities", []),
+        depends_on=task.get("depends_on", []),
+    )
+    await _send_task_assignment(node, picked, hub)
+    logger.info("Reassigned task %s from %s to %s", task_id, old_agent, picked)
+    return picked
