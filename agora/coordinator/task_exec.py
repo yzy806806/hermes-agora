@@ -78,35 +78,3 @@ async def handle_task_status(
             motion_id=task["motion_id"],
             agent_id=agent_id,
         )
-
-
-async def handle_task_accept_result(
-    agent_id: str,
-    payload: dict,
-    storage: Any,
-    hub: Any,
-) -> None:
-    """Process TASK_ACCEPT_RESULT from reviewer agent.
-
-    Updates task to ACCEPTED or REJECTED.
-    If REJECTED, re-queues to PENDING for re-assignment.
-    """
-    task_id = payload.get("task_id")
-    accepted = payload.get("accepted", False)
-    task = await storage.get_task(task_id)
-    if not task:
-        await _send_error(hub, agent_id, "task_not_found",
-                          f"Task {task_id} not found")
-        return
-    if task["status"] != "done":
-        await _send_error(hub, agent_id, "invalid_transition",
-                          f"Task {task_id} not in done state")
-        return
-    if accepted:
-        await storage.update_task_status(task_id, "accepted")
-        logger.info("Task %s accepted by %s", task_id, agent_id)
-    else:
-        await storage.update_task_status(task_id, "rejected")
-        # Re-queue to PENDING for re-assignment
-        await storage.update_task_status(task_id, "pending")
-        logger.info("Task %s rejected by %s, re-queued", task_id, agent_id)

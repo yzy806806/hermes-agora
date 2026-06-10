@@ -133,7 +133,7 @@ async def _route_message(agent_id: str, raw: str, hub) -> None:
         from .task_exec import handle_task_status
         await handle_task_status(agent_id, payload, storage, hub)
     elif msg_type == MessageType.TASK_ACCEPT_RESULT:
-        from .task_exec import handle_task_accept_result
+        from .task_verify import handle_task_accept_result
         await handle_task_accept_result(agent_id, payload, storage, hub)
     else:
         logger.warning("Unknown type from %s: %s", agent_id, msg_type)
