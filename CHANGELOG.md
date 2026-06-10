@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.9.2 (2026-06-10)
+
+### Added
+- **Phase 9.2d Task Execution**: `task_exec.py` handles task execution with result collection, duplicate handler removed
+- **Phase 9.2e Task Verification**: New `task_verify/` package (simple_check, auto_check, accept_result, delegate) replacing monolithic `task_verify.py`
+- **WebSocket Task Dispatch**: `ws_endpoint.py` updated with task dispatch support
+- **New Tests**: `test_accept_result.py`, `test_task_exec_status.py`, `test_task_verify_delegate.py`, `test_ws_task_dispatch.py`
+
+### Changed
+- `test_task_verify.py` converted to async, added dependency check tests
+- `test_task_exec.py` cleaned up (duplicate tests removed)
+- `ws_endpoint.py` imports updated for new task_verify package
+- ROADMAP updated with Phase 9.2d-e status
+- 10+ AsyncMock garbage files cleaned from repo root
+
 ## v0.9.1 (2026-06-10)
 
 ### Added
