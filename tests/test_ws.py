@@ -170,5 +170,5 @@ class TestOnDisconnect:
         with patch("agora.coordinator.ws_endpoint.manager") as m:
             m._storage = mock_storage
             m.broadcast = AsyncMock()
-            await on_agent_disconnect("a1")
+            await on_agent_disconnect("a1", m)
         mock_storage.set_agent_online.assert_called_with("a1", False)

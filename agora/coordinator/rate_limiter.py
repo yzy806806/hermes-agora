@@ -45,3 +45,65 @@ class RateLimiter:
     def reset(self, agent_id: str) -> None:
         """Reset all rate limit counters for an agent."""
         self._counts.pop(agent_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Phase 9.4: Token Bucket rate limiting (TPM tracking)
+# ---------------------------------------------------------------------------
+
+
+import threading
+from dataclasses import dataclass, field
+
+
+@dataclass
+class TokenBucket:
+    """Thread-safe token bucket for TPM rate limiting."""
+
+    capacity: float
+    refill_rate: float  # tokens per second
+    tokens: float = 0.0
+    last_refill: float = 0.0
+    _lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def __post_init__(self):
+        self.tokens = self.capacity
+        self.last_refill = time.monotonic()
+
+    def consume(self, count: int) -> bool:
+        """Try to consume tokens. Returns True if allowed."""
+        with self._lock:
+            self._refill()
+            if self.tokens >= count:
+                self.tokens -= count
+                return True
+            return False
+
+    def _refill(self) -> None:
+        now = time.monotonic()
+        elapsed = now - self.last_refill
+        self.tokens = min(self.capacity, self.tokens + elapsed * self.refill_rate)
+        self.last_refill = now
+
+    @property
+    def available(self) -> float:
+        """Current available tokens (triggers refill)."""
+        with self._lock:
+            self._refill()
+            return self.tokens
+
+    @property
+    def usage_ratio(self) -> float:
+        """0.0 (full) to 1.0 (empty)."""
+        if self.capacity <= 0:
+            return 0.0
+        return 1.0 - (self.available / self.capacity)
+
+    def time_until_available(self, needed: int) -> float:
+        """Seconds until `needed` tokens become available."""
+        avail = self.available
+        if avail >= needed:
+            return 0.0
+        if self.refill_rate <= 0:
+            return float("inf")
+        return (needed - avail) / self.refill_rate

@@ -94,9 +94,13 @@ class Settings(BaseSettings):
     require_api_key: bool = False
     api_key_header: str = "X-Agora-Key"
 
+    # Phase 9.3: Agent registration auth
+    require_approval: bool = False        # env: AGORA_REQUIRE_APPROVAL
+    admin_token: str = ""                 # env: AGORA_ADMIN_TOKEN
+
     # Heartbeat configuration
     heartbeat_interval_seconds: int = 30
-    heartbeat_timeout_seconds: int = 10
+    heartbeat_timeout_seconds: int = 120
     heartbeat_max_missed: int = 3
 
     # Timeout configuration

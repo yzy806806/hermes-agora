@@ -48,6 +48,12 @@ class MessageType(str, Enum):
     TASK_FAILED = "TASK_FAILED"
     TASK_VERIFY = "TASK_VERIFY"
     TASK_ACCEPT_RESULT = "TASK_ACCEPT_RESULT"
+    HEARTBEAT = "HEARTBEAT"  # Phase 9.3: periodic agent heartbeat
+    # Phase 9.4: rate limiting
+    RATE_LIMIT_WARNING = "RATE_LIMIT_WARNING"
+    RATE_LIMITED = "RATE_LIMITED"
+    RATE_LIMIT_RESET = "RATE_LIMIT_RESET"
+    RATE_LIMIT_REPORT = "RATE_LIMIT_REPORT"  # agent → coordinator
 
 
 class MotionStatus(str, Enum):
@@ -101,6 +107,22 @@ class AgentRole(str, Enum):
     OBSERVER = "observer"
 
 
+class AgentType(str, Enum):
+    """How the agent connects to Agora (Phase 9.3)."""
+    HERMES = "hermes"
+    DOCKER = "docker"
+    CLI = "cli"
+    CUSTOM = "custom"
+
+
+class AgentStatus(str, Enum):
+    """Approval + online state combined (Phase 9.3)."""
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    SUSPENDED = "suspended"
+
+
 class DiscussionRole(str, Enum):
     """Discussion roles for multi-model diversity (Phase 6.5)."""
 
@@ -141,14 +163,17 @@ class WSMessage(BaseModel):
 
 
 class AgentRegisterRequest(BaseModel):
-    """Request body for agent registration."""
+    """Request body for agent registration (Phase 9.3)."""
 
     agent_id: str
     name: str
-    hermes_endpoint: str = "http://localhost:8080"
-    model: str
     capabilities: list[str] = Field(default_factory=list)
-    role: AgentRole = AgentRole.PARTICIPANT
+
+    # New fields (Phase 9.3)
+    agent_type: AgentType = AgentType.HERMES
+    model: str = "unknown"
+    max_concurrent_tasks: int = 2
+    auth_token: str = ""  # Agent's own API key for re-auth
 
 
 class AgentInfo(BaseModel):
@@ -156,13 +181,45 @@ class AgentInfo(BaseModel):
 
     agent_id: str
     name: str
-    hermes_endpoint: str = ""
     model: str = ""
+
+    # Phase 9.3 new fields
+    agent_type: AgentType = AgentType.HERMES
+    max_concurrent_tasks: int = 2
+    agent_token: str = ""
+    is_approved: bool = False
+    approval_status: AgentStatus = AgentStatus.PENDING
+
     capabilities: list[str] = Field(default_factory=list)
     role: AgentRole = AgentRole.PARTICIPANT
     registered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_online: bool = False
     last_seen: Optional[datetime] = None
+    load: float = 0.0
+    active_tasks: list[str] = Field(default_factory=list)
+
+
+class AgentConfig(BaseModel):
+    """Per-agent runtime configuration, sent in WELCOME payload."""
+
+    max_concurrent_tasks: int = 2
+    heartbeat_interval_seconds: int = 30
+    heartbeat_timeout_seconds: int = 120
+    tpm_limit: int = 10000
+    tpm_burst_factor: float = 1.5  # Phase 9.4: burst multiplier (1.0-3.0)
+    allowed_discussion_roles: list[str] = Field(
+        default_factory=lambda: ["participant"]
+    )
+    auto_accept_tasks: bool = False
+
+
+class AgentRegistrationResponse(BaseModel):
+    """Response for POST /api/v1/agents/register."""
+
+    agent_id: str
+    status: AgentStatus
+    agent_token: str
+    message: str = ""
 
 
 # ---------------------------------------------------------------------------

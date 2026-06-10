@@ -55,7 +55,7 @@ api_key_header: "X-Agora-Key"
 
 # Heartbeat
 heartbeat_interval_seconds: 30
-heartbeat_timeout_seconds: 10
+heartbeat_timeout_seconds: 120
 heartbeat_max_missed: 3
 
 # Timeouts

@@ -6,6 +6,7 @@ management (DB init on startup, cleanup on shutdown).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import uuid
@@ -28,6 +29,7 @@ from .storage import Storage
 from .ws_endpoint import websocket_endpoint
 from .ws import manager
 from .heartbeat import HeartbeatManager
+from .timeout_checker import heartbeat_timeout_checker
 from .timeout import TimeoutConfig, TimeoutManager
 from .bootstrap import BootstrapConfig, BootstrapEngine
 from .bootstrap.routes import router as bootstrap_router
@@ -36,6 +38,12 @@ from .observability.metrics import init_metrics, metrics
 from .observability.trace import set_trace_id
 from .dashboard import router as dashboard_router
 from .dashboard import init_dashboard_deps
+from .token_rate_limiter import TokenRateLimiter
+from .rate_limit_flush import rate_limit_flush_task
+from .rate_limit_router import router as rate_limit_router
+from .rate_limit_router import init_rate_limit_deps
+from .rate_limit_router2 import router as rate_limit_router2
+from .rate_limit_router2 import init_rate_limit_deps2
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +75,14 @@ async def lifespan(app: FastAPI):
     bootstrap_cfg = BootstrapConfig(db_path=settings.db_path)
     bootstrap_engine = BootstrapEngine(bootstrap_cfg)
     bootstrap_engine.init_routes()
+    # Phase 9.4: Token rate limiter init
+    token_limiter = TokenRateLimiter()
+    app.state.token_limiter = token_limiter
+    init_rate_limit_deps(storage, token_limiter)
+    init_rate_limit_deps2(storage, token_limiter)
+    rl_flush_task = asyncio.create_task(
+        rate_limit_flush_task(token_limiter, storage)
+    )
     # Heartbeat & Timeout init
     heartbeat_mgr = HeartbeatManager(manager)
     timeout_cfg = TimeoutConfig(
@@ -78,9 +94,31 @@ async def lifespan(app: FastAPI):
     app.state.heartbeat_mgr = heartbeat_mgr
     app.state.timeout_mgr = timeout_mgr
     await heartbeat_mgr.start_heartbeat(interval=settings.heartbeat_interval_seconds)
+    # Phase 9.3c: Start heartbeat timeout checker
+    hb_timeout_task = asyncio.create_task(
+        heartbeat_timeout_checker(
+            storage,
+            interval=settings.heartbeat_interval_seconds,
+            timeout=settings.heartbeat_timeout_seconds,
+        )
+    )
     logger.info("Coordinator started (db=%s)", settings.db_path)
     yield
     # Cleanup
+    if rl_flush_task is not None:
+        rl_flush_task.cancel()
+        try:
+            await rl_flush_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Rate limit flush task stopped")
+    if hb_timeout_task is not None:
+        hb_timeout_task.cancel()
+        try:
+            await hb_timeout_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Heartbeat timeout checker stopped")
     await heartbeat_mgr.stop()
     logger.info("Coordinator shutting down")
 
@@ -114,6 +152,8 @@ def create_app() -> FastAPI:
     app.include_router(bootstrap_router, prefix="/api/v1")
     app.include_router(bootstrap_extra_router, prefix="/api/v1")
     app.include_router(dashboard_router, prefix="/api/v1")
+    app.include_router(rate_limit_router, prefix="/api/v1")
+    app.include_router(rate_limit_router2, prefix="/api/v1")
     app.add_api_websocket_route("/ws/{agent_id}", websocket_endpoint)
     # Phase 8.2: tenant-scoped WS (backward compat via default tenant_id)
     # Dashboard static files

@@ -1,20 +1,25 @@
 """HTTP REST API routes for the Agora Coordinator service.
 
 Provides endpoints for agent management, motion CRUD, and result queries.
+Phase 9.3: Updated /agents/register + admin approve/reject/suspend endpoints.
 """
 
 from __future__ import annotations
 
 import logging
+import secrets
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import Response
 
+from .config import settings
 from .models import (
     AgentInfo,
     AgentRegisterRequest,
+    AgentRegistrationResponse,
+    AgentStatus,
     AssessmentResponse,
     Motion,
     MotionCreateRequest,
@@ -62,6 +67,16 @@ def _get_sm() -> StateMachine:
     return _state_machine
 
 
+def _require_admin(authorization: str = Header("")) -> None:
+    """Raise 401 if admin token not set or doesn't match."""
+    admin_token = settings.admin_token
+    if not admin_token:
+        raise HTTPException(status_code=501, detail="Admin token not configured")
+    token = authorization.removeprefix("Bearer ").strip()
+    if token != admin_token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
 # ---------------------------------------------------------------------------
 # Observability API
 # ---------------------------------------------------------------------------
@@ -79,23 +94,49 @@ async def metrics_endpoint() -> Response:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/agents/register", response_model=AgentInfo)
-async def register_agent(request: AgentRegisterRequest) -> AgentInfo:
-    """Register a new agent in the system."""
+@router.post("/agents/register", response_model=AgentRegistrationResponse,
+             status_code=201)
+async def register_agent(request: AgentRegisterRequest) -> AgentRegistrationResponse:
+    """Register a new agent. Returns agent_token for WS auth.
+
+    If AGORA_REQUIRE_APPROVAL=true: agent is PENDING until admin approves.
+    If AGORA_REQUIRE_APPROVAL=false (default): auto-approved.
+    """
     storage = _get_storage()
     existing = await storage.get_agent(request.agent_id)
     if existing is not None:
         raise HTTPException(status_code=409, detail="Agent already registered")
 
-    data = await storage.register_agent(
+    agent_token = f"ag-{secrets.token_hex(16)}"
+    require_approval = settings.require_approval
+    is_approved = not require_approval
+    approval_status = "approved" if is_approved else "pending"
+
+    await storage.register_agent(
         agent_id=request.agent_id,
         name=request.name,
         model=request.model,
-        hermes_endpoint=request.hermes_endpoint,
         capabilities=request.capabilities,
-        role=request.role.value,
+        role="participant",
+        agent_type=request.agent_type.value,
+        max_concurrent_tasks=request.max_concurrent_tasks,
+        agent_token=agent_token,
+        is_approved=is_approved,
+        approval_status=approval_status,
     )
-    return AgentInfo(**data)
+
+    message = (
+        "Registration successful. You can now connect via WebSocket."
+        if is_approved
+        else "Registration pending approval. An admin must approve before you can connect."
+    )
+
+    return AgentRegistrationResponse(
+        agent_id=request.agent_id,
+        status=AgentStatus(approval_status),
+        agent_token=agent_token,
+        message=message,
+    )
 
 
 @router.delete("/agents/{agent_id}")
@@ -118,6 +159,62 @@ async def list_agents() -> list[AgentInfo]:
 
 
 # ---------------------------------------------------------------------------
+# Admin API (Phase 9.3)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/admin/agents", response_model=list[AgentInfo])
+async def admin_list_agents(authorization: str = Header("")) -> list[AgentInfo]:
+    """List all agents including approval status. Admin only."""
+    _require_admin(authorization)
+    storage = _get_storage()
+    agents = await storage.list_agents()
+    return [AgentInfo(**a) for a in agents]
+
+
+@router.post("/admin/agents/{agent_id}/approve")
+async def admin_approve_agent(
+    agent_id: str, authorization: str = Header(""),
+) -> dict:
+    """Approve a pending agent. Admin only."""
+    _require_admin(authorization)
+    storage = _get_storage()
+    agent = await storage.get_agent(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    await storage.set_agent_approval(agent_id, True, "approved")
+    return {"agent_id": agent_id, "status": "approved"}
+
+
+@router.post("/admin/agents/{agent_id}/reject")
+async def admin_reject_agent(
+    agent_id: str, authorization: str = Header(""),
+) -> dict:
+    """Reject a pending agent. Admin only."""
+    _require_admin(authorization)
+    storage = _get_storage()
+    agent = await storage.get_agent(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    await storage.set_agent_approval(agent_id, False, "rejected")
+    return {"agent_id": agent_id, "status": "rejected"}
+
+
+@router.post("/admin/agents/{agent_id}/suspend")
+async def admin_suspend_agent(
+    agent_id: str, authorization: str = Header(""),
+) -> dict:
+    """Suspend a previously approved agent. Admin only."""
+    _require_admin(authorization)
+    storage = _get_storage()
+    agent = await storage.get_agent(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    await storage.set_agent_approval(agent_id, False, "suspended")
+    return {"agent_id": agent_id, "status": "suspended"}
+
+
+# ---------------------------------------------------------------------------
 # Motion API
 # ---------------------------------------------------------------------------
 
@@ -133,7 +230,6 @@ async def create_motion(request: MotionCreateRequest) -> Motion:
         voting_method=request.voting_method.value,
         context=request.context or "",
     )
-    # Phase 3: Curator optimization
     if _curator is not None:
         try:
             optimized = await _curator.optimize_motion(data)

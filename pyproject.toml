@@ -1,6 +1,6 @@
 [project]
 name = "agora"
-version = "0.9.2"
+version = "0.9.3"
 description = "Multi-Agent Deliberation Platform"
 readme = "README.md"
 license = {text = "MIT"}

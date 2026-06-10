@@ -14,7 +14,7 @@ class TestConfigSettings:
     def test_heartbeat_defaults(self):
         s = Settings()
         assert s.heartbeat_interval_seconds == 30
-        assert s.heartbeat_timeout_seconds == 10
+        assert s.heartbeat_timeout_seconds == 120
         assert s.heartbeat_max_missed == 3
 
     def test_timeout_defaults(self):

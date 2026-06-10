@@ -1,6 +1,6 @@
 """SQL schema definitions for the Agora Coordinator database."""
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 8
 
 SCHEMA_SQL = """\
 PRAGMA foreign_keys = ON;
@@ -14,7 +14,16 @@ CREATE TABLE IF NOT EXISTS agents (
     role TEXT DEFAULT 'expert',
     registered_at TEXT NOT NULL,
     is_online INTEGER DEFAULT 0,
-    last_seen_at TEXT
+    last_seen_at TEXT,
+    agent_type TEXT DEFAULT 'hermes',
+    max_concurrent_tasks INTEGER DEFAULT 2,
+    agent_token TEXT DEFAULT '',
+    is_approved INTEGER DEFAULT 0,
+    approval_status TEXT DEFAULT 'pending',
+    load REAL DEFAULT 0.0,
+    active_tasks TEXT DEFAULT '[]',
+    tpm_limit INTEGER DEFAULT 10000,
+    tpm_burst_factor REAL DEFAULT 1.5
 );
 
 CREATE TABLE IF NOT EXISTS motions (
@@ -203,4 +212,44 @@ CREATE INDEX IF NOT EXISTS idx_tasks_graph ON tasks(graph_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_motion ON tasks(motion_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to);
+
+-- Phase 9.4: Rate limit usage tracking
+CREATE TABLE IF NOT EXISTS rate_limit_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL,
+    window_start REAL NOT NULL,
+    tokens_consumed INTEGER NOT NULL DEFAULT 0,
+    tpm_limit INTEGER NOT NULL,
+    last_updated REAL NOT NULL,
+    UNIQUE(agent_id, window_start)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rate_limit_agent ON rate_limit_usage(agent_id);
 """
+
+# Phase 9.3: Agent model migration (schema version 6 → 7)
+MIGRATION_6_TO_7 = [
+    "ALTER TABLE agents ADD COLUMN agent_type TEXT DEFAULT 'hermes';",
+    "ALTER TABLE agents ADD COLUMN max_concurrent_tasks INTEGER DEFAULT 2;",
+    "ALTER TABLE agents ADD COLUMN agent_token TEXT DEFAULT '';",
+    "ALTER TABLE agents ADD COLUMN is_approved INTEGER DEFAULT 0;",
+    "ALTER TABLE agents ADD COLUMN approval_status TEXT DEFAULT 'pending';",
+    "ALTER TABLE agents ADD COLUMN load REAL DEFAULT 0.0;",
+    "ALTER TABLE agents ADD COLUMN active_tasks TEXT DEFAULT '[]';",
+]
+
+# Phase 9.4: Rate limit usage table + agent tpm columns (schema version 7 → 8)
+MIGRATION_7_TO_8 = [
+    """CREATE TABLE IF NOT EXISTS rate_limit_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL,
+    window_start REAL NOT NULL,
+    tokens_consumed INTEGER NOT NULL DEFAULT 0,
+    tpm_limit INTEGER NOT NULL,
+    last_updated REAL NOT NULL,
+    UNIQUE(agent_id, window_start)
+);""",
+    "CREATE INDEX IF NOT EXISTS idx_rate_limit_agent ON rate_limit_usage(agent_id);",
+    "ALTER TABLE agents ADD COLUMN tpm_limit INTEGER DEFAULT 10000;",
+    "ALTER TABLE agents ADD COLUMN tpm_burst_factor REAL DEFAULT 1.5;",
+]

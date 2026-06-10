@@ -14,6 +14,7 @@ from typing import Optional
 import aiosqlite
 
 from . import agents as _agents
+from . import agent_heartbeat as _agent_hb
 from . import assessments as _assessments
 from . import bootstrap as _bootstrap
 from . import bootstrap_approval as _bootstrap_approval
@@ -23,7 +24,7 @@ from . import messages as _messages
 from . import motions as _motions
 from . import tasks as _tasks
 from . import votes as _votes
-from .schema import SCHEMA_SQL, SCHEMA_VERSION
+from .schema import SCHEMA_SQL, SCHEMA_VERSION, MIGRATION_6_TO_7, MIGRATION_7_TO_8
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +48,30 @@ class Storage:
             await conn.close()
 
     async def init_db(self) -> None:
-        """Initialize database tables and schema version tracking."""
+        """Initialize database tables and run pending migrations."""
         async with aiosqlite.connect(self.db_path) as db:
             await db.executescript(SCHEMA_SQL)
             await db.execute(
                 """CREATE TABLE IF NOT EXISTS schema_version (
                     version INTEGER PRIMARY KEY, applied_at TEXT)"""
             )
+            # Check current version and run migrations
+            async with db.execute(
+                "SELECT MAX(version) FROM schema_version"
+            ) as cur:
+                row = await cur.fetchone()
+            current_ver = row[0] if row and row[0] else SCHEMA_VERSION
+
+            if current_ver < 7:
+                for stmt in MIGRATION_6_TO_7:
+                    await db.execute(stmt)
+                logger.info("Applied migration 6→7 (Phase 9.3 agent columns)")
+
+            if current_ver < 8:
+                for stmt in MIGRATION_7_TO_8:
+                    await db.execute(stmt)
+                logger.info("Applied migration 7→8 (Phase 9.4 rate_limit_usage)")
+
             await db.execute(
                 "INSERT OR IGNORE INTO schema_version VALUES (?, ?)",
                 [SCHEMA_VERSION, datetime.now(timezone.utc).isoformat()],
@@ -63,17 +81,37 @@ class Storage:
 
     # --- Agent CRUD ---
 
-    async def register_agent(self, agent_id: str, name: str, model: str,
-                             hermes_endpoint: str = "",
+    async def register_agent(self, agent_id: str, name: str, model: str = "unknown",
                              capabilities: list[str] | None = None,
-                             role: str = "expert") -> dict:
+                             role: str = "participant",
+                             agent_type: str = "hermes",
+                             max_concurrent_tasks: int = 2,
+                             agent_token: str = "",
+                             is_approved: bool = False,
+                             approval_status: str = "pending",
+                             tpm_limit: int = 10000,
+                             tpm_burst_factor: float = 1.5,
+                             **kwargs) -> dict:
         async with self._connection() as db:
             return await _agents.register_agent(
-                db, agent_id, name, model, hermes_endpoint, capabilities, role)
+                db, agent_id, name, model,
+                capabilities=capabilities, role=role,
+                agent_type=agent_type,
+                max_concurrent_tasks=max_concurrent_tasks,
+                agent_token=agent_token,
+                is_approved=is_approved,
+                approval_status=approval_status,
+                tpm_limit=tpm_limit,
+                tpm_burst_factor=tpm_burst_factor,
+            )
 
     async def get_agent(self, agent_id: str) -> Optional[dict]:
         async with self._connection() as db:
             return await _agents.get_agent(db, agent_id)
+
+    async def get_agent_by_token(self, token: str) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _agents.get_agent_by_token(db, token)
 
     async def list_agents(self, online_only: bool = False) -> list[dict]:
         async with self._connection() as db:
@@ -86,6 +124,24 @@ class Storage:
     async def deregister_agent(self, agent_id: str) -> None:
         async with self._connection() as db:
             await _agents.deregister_agent(db, agent_id)
+
+    async def set_agent_approval(
+        self, agent_id: str, is_approved: bool, approval_status: str,
+    ) -> None:
+        """Approve/reject/suspend an agent (Phase 9.3)."""
+        async with self._connection() as db:
+            await _agents.set_agent_approval(
+                db, agent_id, is_approved, approval_status)
+
+    async def update_agent_tpm_config(
+        self, agent_id: str,
+        tpm_limit: int | None = None,
+        tpm_burst_factor: float | None = None,
+    ) -> None:
+        """Persist agent TPM config to DB (Phase 9.4)."""
+        async with self._connection() as db:
+            await _agents.update_agent_tpm_config(
+                db, agent_id, tpm_limit, tpm_burst_factor)
 
     # --- Motion CRUD ---
 
@@ -373,3 +429,32 @@ class Storage:
         async with self._connection() as db:
             return await _tasks.get_agent_task_count(
                 db, agent_id, active_only)
+
+    # --- Agent Heartbeat CRUD (Phase 9.3c) ---
+
+    async def update_agent_heartbeat(
+        self, agent_id: str, load: float = 0.0,
+        active_tasks: list[str] | None = None,
+    ) -> None:
+        async with self._connection() as db:
+            await _agent_hb.update_agent_heartbeat(
+                db, agent_id, load, active_tasks)
+
+    async def update_agent_capabilities(
+        self, agent_id: str, capabilities: list[str],
+    ) -> None:
+        async with self._connection() as db:
+            await _agent_hb.update_agent_capabilities(
+                db, agent_id, capabilities)
+
+    async def update_agent_model(
+        self, agent_id: str, model: str,
+    ) -> None:
+        async with self._connection() as db:
+            await _agent_hb.update_agent_model(db, agent_id, model)
+
+    async def list_stale_agents(
+        self, timeout_seconds: int = 120,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _agent_hb.list_stale_agents(db, timeout_seconds)

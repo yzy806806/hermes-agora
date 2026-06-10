@@ -69,16 +69,18 @@ class TestAgentAPI:
     def test_register_agent(self, client, mock_storage):
         resp = client.post("/agents/register", json={
             "agent_id": "a1", "name": "Test",
-            "model": "gpt-4", "hermes_endpoint": "http://localhost",
+            "model": "gpt-4",
         })
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         data = resp.json()
         assert data["agent_id"] == "a1"
+        assert "agent_token" in data
+        assert data["status"] in ("approved", "pending")
 
     def test_register_duplicate(self, client, mock_storage):
         mock_storage.get_agent = AsyncMock(return_value={"agent_id": "a1"})
         resp = client.post("/agents/register", json={
-            "agent_id": "a1", "name": "Test", "model": "gpt-4",
+            "agent_id": "a1", "name": "Test",
         })
         assert resp.status_code == 409
 

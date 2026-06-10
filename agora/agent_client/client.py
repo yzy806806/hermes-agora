@@ -11,6 +11,7 @@ from typing import Any
 import httpx
 
 from .config import AgoraConfig
+from .rate_limit import RateLimitTracker
 from .ws_pool import WSConnection
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ class AgoraClient:
             timeout=config.request_timeout,
         )
         self._ws = WSConnection(config)
+        self.rate_limiter = RateLimitTracker()
 
     # -- HTTP helpers --------------------------------------------------------
 
@@ -136,6 +138,40 @@ class AgoraClient:
             payload = resp.get("payload", {})
             return self._error(payload.get("code", "WS_ERROR"), payload.get("message", ""))
         return {"status": "success", "motion_id": motion_id, "vote": vote, "message": "Vote submitted"}
+
+    # -- Rate limit -----------------------------------------------------------
+
+    async def _on_welcome(self, payload: dict) -> None:
+        """Handle WELCOME message, update rate limit config."""
+        config = payload.get("config", {})
+        if "tpm_limit" in config:
+            self.rate_limiter.update_config(
+                tpm_limit=config["tpm_limit"],
+                burst_factor=config.get("tpm_burst_factor", 1.5),
+            )
+
+    async def report_token_usage(
+        self, tokens_used: int, model: str = "", request_id: str = "",
+    ) -> dict[str, Any]:
+        """Report token usage to coordinator after LLM call."""
+        await self.rate_limiter.report(tokens_used)
+        return await self._post(
+            f"/api/v1/agents/{self._config.agent_id}/rate-limit/report",
+            {"tokens_used": tokens_used, "model": model, "request_id": request_id},
+        )
+
+    async def check_rate_limit(self, estimated_tokens: int) -> dict[str, Any]:
+        """Check if an LLM call of estimated_tokens is allowed."""
+        return await self._post(
+            f"/api/v1/agents/{self._config.agent_id}/rate-limit/check",
+            {"estimated_tokens": estimated_tokens},
+        )
+
+    async def get_rate_limit_status(self) -> dict[str, Any]:
+        """Get current rate limit status from coordinator."""
+        return await self._get(
+            f"/api/v1/agents/{self._config.agent_id}/rate-limit",
+        )
 
     # -- Lifecycle -----------------------------------------------------------
 
