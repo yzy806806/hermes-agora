@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.9.3 (2026-06-10)
+
+### Added
+- **Phase 9.3 Agent Registration Protocol**: Token-based WebSocket authentication with pending/reserved agent flow (`ws_endpoint.py`, `ws_handlers.py`, `router.py`)
+- **Agent Heartbeat + Timeout**: Background heartbeat checker (`agent_heartbeat.py`), timeout detection (`timeout_checker.py`), online tracking
+- **Agent Capability Declaration**: Capability model (`capability.py`) and registration in main
+- **Agent Storage Updates**: Schema v7 with agent registrations, pending tokens, status tracking (`schema.py`, `agents.py`, `storage.py`)
+- **Phase 9.4 API Rate Limiting**: TokenBucket algorithm (`token_rate_limiter.py`), existing rate limiter enhanced (`rate_limiter.py`)
+- **Client-Side Rate Limiting**: RateLimitTracker in agent client (`rate_limit.py`, `client.py`)
+- **Rate Limit Routing + Flush**: Coordinated rate limit enforcement (`rate_limit_router.py`, `rate_limit_router2.py`, `rate_limit_flush.py`)
+- **WS Rate Limit Integration**: Per-connection rate limiting in WebSocket layer (`ws_rate_limit.py`)
+- **Tests**: 9 new test files — 6 for Phase 9.3 (models, storage, auth, heartbeat×2, timeout) + 3 for Phase 9.4 (tracker, bucket, limiter) — 62/62 total passing
+- **Design Doc**: Phase 9 rate limiting design document (`DESIGN-phase9-rate-limiting.md`)
+
+### Changed
+- Agent client `__init__.py` and `client.py` updated for rate limit tracker integration
+- Coordinator `main.py`, `models.py`, `config.py`, `config_defaults.yaml` updated for Phase 9.3 + 9.4
+- `ws_endpoint.py` and `ws_handlers.py` — major overhaul for auth flow and rate limiting
+- Test files `test_main_integration.py`, `test_router.py`, `test_ws.py` updated for new features
+- ROADMAP updated with Phase 9.3—9.4 status
+- 11 AsyncMock garbage files cleaned from repo root
+
 ## v0.9.2 (2026-06-10)
 
 ### Added
