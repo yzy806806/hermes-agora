@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.9.4 (2026-06-10)
+
+### Changed
+- **Phase 9.5a Documentation Update**: README, API docs, and ARCHITECTURE updated to reflect v0.9.3 features
+- API documentation expanded with Agent register/approve/heartbeat + Rate Limit API endpoints
+- Architecture documentation updated with platform independence, task engine, Agent registry, and Rate Limiter architecture
+- ROADMAP updated with Phase 9.5a status
+
 ## v0.9.3 (2026-06-10)
 
 ### Added
