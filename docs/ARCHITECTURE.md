@@ -1,6 +1,6 @@
-# Hermes Agora 架构文档
+# Agora 架构文档
 
-> 版本: v0.8.0 | 最后更新: 2026-06
+> 版本: v0.9.3 | 最后更新: 2026-06-10
 
 ## 整体架构
 
@@ -29,130 +29,166 @@
                     │  │ ability   │ │ Manager       │  │
                     │  └───────────┘ └───────────────┘  │
                     │  ┌───────────┐ ┌───────────────┐  │
-                    │  │ Dashboard │ │ Storage Mgr   │  │
-                    │  │ (static)  │ │ (multi-tenant)│  │
+                    │  │ Task      │ │ Agent         │  │
+                    │  │ Execution │ │ Registry      │  │
+                    │  │ Engine    │ │ + Auth        │  │
+                    │  └───────────┘ └───────────────┘  │
+                    │  ┌───────────┐ ┌───────────────┐  │
+                    │  │ API Rate  │ │ Dashboard     │  │
+                    │  │ Limiter   │ │ (static)      │  │
                     │  └───────────┘ └───────────────┘  │
                     │  ┌───────────────────────────┐    │
                     │  │ Storage (SQLite)          │    │
                     │  └───────────────────────────┘    │
                     └────────────┬────────────────────┘
-                                 │ WebSocket
+                                 │ WebSocket / REST
         ┌────────────────────────┼────────────────────────┐
         ↓                        ↓                        ↓
    ┌─────────┐            ┌─────────┐            ┌─────────┐
-   │ Hermes A│            │ Hermes B│            │ Hermes C│
-   │ + Agora │            │ + Agora │            │ + Agora │
-   │  Client │            │  Client │            │  Client │
+   │ Hermes  │            │ Docker  │            │ Custom  │
+   │ Agent   │            │ Agent   │            │ HTTP    │
+   │ (agora- │            │ (agora- │            │ Agent   │
+   │  client)│            │  client)│            │         │
    └─────────┘            └─────────┘            └─────────┘
 ```
 
 ## 项目目录结构
 
 ```
-hermes-agora/
-├── __init__.py              # Hermes 插件入口 + register()
-├── plugin.yaml              # 插件元数据
-├── commands.py              # /agora 斜杠命令路由
-├── cmd_new.py               # /agora new 子命令
-├── cmd_list.py              # /agora list 子命令
-├── cmd_status.py            # /agora status 子命令
-├── cmd_vote.py              # /agora vote 子命令
-├── cmd_result.py            # /agora result 子命令
-├── coordinator/             # 调度中心（FastAPI 服务）
-│   ├── main.py              # 入口 + 生命周期管理
-│   ├── config.py            # 配置（pydantic-settings）
-│   ├── models.py            # 数据模型 + 枚举
-│   ├── state.py             # 讨论状态机
-│   ├── router.py            # REST API 路由
-│   ├── ws.py                # WebSocket 连接管理器
-│   ├── ws_endpoint.py       # WebSocket 端点 + 消息路由
-│   ├── ws_handlers.py       # PING/REGISTER/SPEAK 处理
-│   ├── ws_smart.py          # 智能讨论评估
-│   ├── ws_vote.py           # VOTE 处理 + 投票完成检测
-│   ├── assessment.py        # 讨论评估引擎
-│   ├── consensus_jump.py    # 共识提前判断
-│   ├── devils_advocate.py   # 魔鬼代言人
-│   ├── focus.py             # 分歧点聚焦
-│   ├── dynamic_rounds.py    # 动态轮次调整
-│   ├── smart_scheduler.py   # 智能调度
-│   ├── realtime_evaluator.py# 实时评估
-│   ├── quality_scorer.py    # 质量评分
-│   ├── quality_guard.py     # 质量守卫
-│   ├── quality_guard_checks.py # 质量检查函数
-│   ├── quality_guard_models.py # 质量守卫数据模型
-│   ├── perspective_ensurer.py  # 视角保障
-│   ├── role_assigner.py     # 讨论角色分配
-│   ├── model_capabilities.py   # 模型能力识别
-│   ├── curator.py           # 策略优化（进化闭环）
-│   ├── memory_sync.py       # 讨论经验同步
-│   ├── history_pattern.py   # 历史模式分析
-│   ├── similar_topic.py     # 相似议题检索
-│   ├── judgment_tracker.py  # 判断追踪
-│   ├── judgment_types.py    # 判断类型定义
-│   ├── conclusion_types.py  # 结论类型定义
-│   ├── heartbeat.py         # 心跳监控
-│   ├── timeout.py           # 超时管理
-│   ├── deadlock_prevention.py # 死锁预防
-│   ├── input_validation.py  # 输入验证 + 清洗
-│   ├── rate_limiter.py      # 速率限制
-│   ├── observability/       # 可观测性 (Phase 8)
+agora/
+├── __init__.py              # 包初始化，版本声明
+├── cli.py                   # CLI 入口: agora serve / agent
+├── __main__.py              # python -m agora
+├── pyproject.toml           # 构建配置 (hatchling)
+├── Dockerfile               # Coordinator Docker 镜像
+├── Dockerfile.agent         # Agent 镜像模板
+├── docker-compose.yaml      # 开发环境编排
+├── config.yaml              # 全局配置文件
+├── config_defaults.yaml     # 配置默认值
+├── agora/                   # 核心包
+│   ├── __init__.py
+│   ├── coordinator/         # 调度中心
 │   │   ├── __init__.py
-│   │   ├── metrics.py       # Prometheus 指标
-│   │   ├── events.py        # 结构化事件
-│   │   └── trace.py         # 追踪上下文
-│   ├── tenant/              # 多租户 (Phase 8)
-│   │   ├── __init__.py
-│   │   ├── models.py        # Tenant + TenantConfig
-│   │   ├── manager.py       # 租户 CRUD
-│   │   ├── guard.py         # 资源限制
-│   │   └── router.py        # 租户 API
-│   ├── dashboard.py         # Dashboard API (Phase 8)
-│   ├── static/              # Dashboard 前端 (Phase 8)
-│   │   ├── dashboard.html
-│   │   └── dashboard.js
-│   ├── voting/              # 投票子系统
-│   │   ├── __init__.py
-│   │   ├── factory.py       # 投票策略工厂
-│   │   ├── manager.py       # 投票管理器
-│   │   ├── weighted.py      # 加权投票
-│   │   ├── weighted_types.py# 加权类型定义
-│   │   ├── weight_manager.py# 权重管理
-│   │   ├── ranked_choice.py # 排序选择投票
-│   │   ├── approval_voting.py # 批准投票
-│   │   ├── range_voting.py  # 评分投票
-│   │   └── multiple_choice.py # 多选投票
-│   ├── bootstrap/           # 自举系统
-│   │   ├── __init__.py      # BootstrapEngine
-│   │   ├── trigger_types.py # 触发器类型
-│   │   ├── trigger_manager.py # 触发器管理
-│   │   ├── schedule_checker.py # 定时检查
-│   │   ├── task_generator.py # 议题生成
-│   │   ├── discussion_driver.py # 讨论驱动
-│   │   ├── approval_flow.py # 审批流程
-│   │   ├── bootstrap_schema.py # 自举数据模型
-│   │   ├── routes.py        # Bootstrap REST 路由
-│   │   └── routes_extra.py  # 审批/调度路由
-│   └── storage/             # 数据存储层
-│       ├── __init__.py      # Storage 入口
-│       ├── schema.py        # 数据库 Schema
-│       ├── storage.py       # 核心存储操作
-│       ├── agents.py        # Agent 存储
-│       ├── motions.py       # 议题存储
-│       ├── messages.py      # 消息存储
-│       ├── votes.py         # 投票存储
-│       ├── assessments.py   # 评估存储
-│       ├── judgments.py     # 判断存储
-│       ├── bootstrap.py     # 自举存储
-│       ├── bootstrap_approval.py # 审批存储
-│       ├── events.py        # 事件存储 (Phase 8)
-│       ├── global_store.py  # 全局数据库 (Phase 8)
-│       └── storage_manager.py # 多租户管理 (Phase 8)
-├── agent_client/            # Agent 客户端库
-│   ├── __init__.py          # 导出 AgoraClient/AgoraConfig
-│   ├── client.py            # HTTP + WebSocket 客户端
-│   ├── config.py            # 客户端配置
-│   └── ws_pool.py           # WS 连接池 + 自动重连
-├── tests/                   # 测试（60+ 文件）
+│   │   ├── main.py          # FastAPI 入口 + 生命周期
+│   │   ├── config.py        # 配置（pydantic-settings）
+│   │   ├── config_loader.py # YAML 配置加载
+│   │   ├── models.py        # 数据模型 + 枚举
+│   │   ├── state.py         # 讨论状态机
+│   │   ├── router.py        # REST API 路由
+│   │   ├── ws.py            # WebSocket 连接管理器
+│   │   ├── ws_endpoint.py   # WS 端点 + 消息路由 + 认证
+│   │   ├── ws_handlers.py   # 消息处理 + HEARTBEAT + 任务调度
+│   │   ├── ws_smart.py      # 智能讨论评估
+│   │   ├── ws_vote.py       # VOTE 处理 + 投票完成检测
+│   │   ├── ws_rate_limit.py # WS 层速率限制集成
+│   │   ├── capability.py    # Agent 能力模型
+│   │   ├── token_rate_limiter.py # TokenBucket 算法 (Phase 9.4)
+│   │   ├── rate_limiter.py  # 速率限制器 (TPM 增强)
+│   │   ├── rate_limit_router.py  # 速率限制路由
+│   │   ├── rate_limit_router2.py # 速率限制路由 v2
+│   │   ├── rate_limit_flush.py   # 速率限制持久化
+│   │   ├── timeout_checker.py # Agent 超时检测
+│   │   ├── assessment.py    # 讨论评估引擎
+│   │   ├── consensus_jump.py# 共识提前判断
+│   │   ├── devils_advocate.py # 魔鬼代言人
+│   │   ├── focus.py         # 分歧点聚焦
+│   │   ├── dynamic_rounds.py# 动态轮次调整
+│   │   ├── smart_scheduler.py # 智能调度
+│   │   ├── realtime_evaluator.py # 实时评估
+│   │   ├── quality_scorer.py# 质量评分
+│   │   ├── quality_guard.py # 质量守卫
+│   │   ├── quality_guard_checks.py # 质量检查函数
+│   │   ├── quality_guard_models.py # 质量守卫数据模型
+│   │   ├── perspective_ensurer.py # 视角保障
+│   │   ├── role_assigner.py # 讨论角色分配
+│   │   ├── model_capabilities.py # 模型能力识别
+│   │   ├── curator.py       # 策略优化（进化闭环）
+│   │   ├── memory_sync.py   # 讨论经验同步
+│   │   ├── history_pattern.py # 历史模式分析
+│   │   ├── similar_topic.py # 相似议题检索
+│   │   ├── judgment_tracker.py # 判断追踪
+│   │   ├── judgment_types.py # 判断类型定义
+│   │   ├── conclusion_types.py # 结论类型定义
+│   │   ├── heartbeat.py     # 心跳监控
+│   │   ├── timeout.py       # 超时管理
+│   │   ├── deadlock_prevention.py # 死锁预防
+│   │   ├── input_validation.py # 输入验证 + 清洗
+│   │   ├── task_models.py   # 任务数据模型 (Phase 9.2)
+│   │   ├── task_assign.py   # 任务分配（能力匹配+轮询）
+│   │   ├── task_exec.py     # 任务执行管理器
+│   │   ├── task_gen/        # 任务生成子系统 (Phase 9.2)
+│   │   │   ├── __init__.py
+│   │   │   ├── generator.py # LLM 驱动任务分解
+│   │   │   ├── heuristic.py # 启发式降级
+│   │   │   ├── prompts.py   # 生成提示词
+│   │   │   └── validation.py# 任务验证
+│   │   ├── task_verify/     # 任务验证子系统 (Phase 9.2)
+│   │   │   ├── __init__.py
+│   │   │   ├── simple_check.py # 简单检查
+│   │   │   ├── auto_check.py   # 自动检查
+│   │   │   ├── accept_result.py # 接受结果
+│   │   │   └── delegate.py   # 委托审查
+│   │   ├── voting/          # 投票子系统
+│   │   │   ├── __init__.py
+│   │   │   ├── factory.py   # 投票策略工厂
+│   │   │   ├── manager.py   # 投票管理器
+│   │   │   ├── weighted.py  # 加权投票
+│   │   │   ├── weighted_types.py # 加权类型
+│   │   │   ├── weight_manager.py # 权重管理
+│   │   │   ├── ranked_choice.py  # 排序选择投票
+│   │   │   ├── approval_voting.py # 批准投票
+│   │   │   ├── range_voting.py  # 评分投票
+│   │   │   └── multiple_choice.py # 多选投票
+│   │   ├── observability/   # 可观测性 (Phase 8)
+│   │   │   ├── __init__.py
+│   │   │   ├── metrics.py   # Prometheus 指标
+│   │   │   ├── events.py    # 结构化事件
+│   │   │   └── trace.py     # 追踪上下文
+│   │   ├── tenant/          # 多租户 (Phase 8)
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py    # Tenant + TenantConfig
+│   │   │   ├── manager.py   # 租户 CRUD
+│   │   │   ├── guard.py     # 资源限制
+│   │   │   └── router.py    # 租户 API
+│   │   ├── bootstrap/       # 自举系统
+│   │   │   ├── __init__.py  # BootstrapEngine
+│   │   │   ├── trigger_types.py # 触发器类型
+│   │   │   ├── trigger_manager.py # 触发器管理
+│   │   │   ├── schedule_checker.py # 定时检查
+│   │   │   ├── task_generator.py # 议题生成
+│   │   │   ├── discussion_driver.py # 讨论驱动
+│   │   │   ├── approval_flow.py  # 审批流程
+│   │   │   ├── bootstrap_schema.py # 自举数据模型
+│   │   │   ├── routes.py    # Bootstrap REST 路由
+│   │   │   └── routes_extra.py # 审批/调度路由
+│   │   ├── storage/         # 数据存储层
+│   │   │   ├── __init__.py  # Storage 入口
+│   │   │   ├── schema.py    # 数据库 Schema (v7)
+│   │   │   ├── storage.py   # 核心存储操作
+│   │   │   ├── agents.py    # Agent 存储（含注册/审批/token）
+│   │   │   ├── motions.py   # 议题存储
+│   │   │   ├── messages.py  # 消息存储
+│   │   │   ├── votes.py     # 投票存储
+│   │   │   ├── tasks.py     # 任务存储 (Phase 9.2)
+│   │   │   ├── agent_heartbeat.py # 心跳检测存储
+│   │   │   ├── assessments.py  # 评估存储
+│   │   │   ├── judgments.py # 判断存储
+│   │   │   ├── bootstrap.py # 自举存储
+│   │   │   ├── bootstrap_approval.py # 审批存储
+│   │   │   ├── events.py    # 事件存储 (Phase 8)
+│   │   │   ├── global_store.py # 全局数据库 (Phase 8)
+│   │   │   └── storage_manager.py # 多租户管理 (Phase 8)
+│   │   ├── dashboard.py     # Dashboard API (Phase 8)
+│   │   └── static/          # Dashboard 前端 (Phase 8)
+│   │       ├── dashboard.html
+│   │       └── dashboard.js
+│   └── agent_client/        # Agent 客户端库
+│       ├── __init__.py      # 导出 AgoraClient/AgoraConfig
+│       ├── client.py        # HTTP + WS 客户端（含 RateLimitTracker）
+│       ├── config.py        # 客户端配置
+│       ├── rate_limit.py    # 客户端速率限制 (Phase 9.4)
+│       └── ws_pool.py       # WS 连接池 + 自动重连
+├── tests/                   # 测试（70+ 文件，62+ 测试全部通过）
 └── docs/                    # 设计文档
 ```
 
@@ -167,6 +203,10 @@ hermes-agora/
 | 5 | 容错安全 | heartbeat, timeout, deadlock_prevention, input_validation, rate_limiter | 连接监控+输入防护 |
 | 6 | 质量增强 | quality_guard, quality_scorer, perspective_ensurer, role_assigner, model_capabilities | 质量守卫+多模型差异 |
 | 8 | 可观测性+多租户 | observability/*, tenant/*, dashboard, storage_manager | 指标暴露+事件追踪+多租户隔离+Dashboard |
+| 9.1 | 平台独立化 | cli, pyproject.toml, Dockerfile, config.yaml, config_loader | `agora/` 包结构、pip 安装、Docker 部署 |
+| 9.2 | 任务执行引擎 | task_models, task_gen/*, task_assign, task_exec, task_verify/* | 讨论→TaskGraph→分配→执行→验证 |
+| 9.3 | Agent 注册协议 | AgentType/AgentStatus/AgentConfig 模型, token 认证, HEARTBEAT + capability | 标准化注册、审批、心跳、能力声明 |
+| 9.4 | API 速率限制 | TokenBucket, TokenRateLimiter, RateLimitTracker, ws_rate_limit | per-agent TPM 令牌桶限速 |
 
 ## 模块关系图
 
@@ -176,16 +216,18 @@ hermes-agora/
                           └────┬────┘
                  ┌─────────────┼─────────────┐
                  ↓             ↓              ↓
-           ┌──────────┐  ┌─────────┐  ┌──────────────┐
-           │ router.py│  │ ws_ep.py│  │ bootstrap/*  │
-           │(REST API)│  │(WS 端点)│  │(自举路由)     │
-           └─────┬────┘  └────┬────┘  └──────┬───────┘
-                 │            │               │
-                 ↓            ↓               ↓
+           ┌──────────┐  ┌──────────┐  ┌───────────────┐
+           │ router.py│  │ ws_ep.py │  │ bootstrap/*   │
+           │(REST API)│  │(WS 端点) │  │(自举路由)      │
+           └─────┬────┘  └────┬─────┘  └──────┬────────┘
+                 │            │                │
+                 ↓            ↓                ↓
            ┌──────────┐  ┌──────────────┐  ┌────────────┐
            │ state.py │  │ ws_handlers  │  │ approval_  │
            │(状态机)   │  │ ws_vote      │  │ flow.py    │
            └─────┬────┘  │ ws_smart     │  └────────────┘
+                 │       │ task_assign  │
+                 │       │ task_exec    │
                  │       └──────┬───────┘
                  │              │
     ┌────────────┼──────────────┼─────────────────┐
@@ -193,17 +235,26 @@ hermes-agora/
 ┌────────┐ ┌──────────┐ ┌──────────────┐ ┌─────────────┐
 │storage │ │assessment│ │ voting/*     │ │ curator     │
 │(SQLite)│ │consensus │ │(投票子系统)   │ │(策略优化)    │
-│        │ │devils_adv│ │              │ │memory_sync  │
+│v7      │ │devils_adv│ │              │ │memory_sync  │
 │        │ │focus     │ │              │ │history_pat  │
 │        │ │quality*  │ │              │ │similar_topic│
 │        │ │role_assign│ │              │ │judgment_trk │
 │        │ │heartbeat │ │              │ └─────────────┘
 │        │ │timeout   │ │              │
 │        │ │deadlock  │ │              │  ┌─────────────┐
-│        │ │rate_limit│ │              │  │ Phase 8:    │
-│        │ │input_val │ │              │  │observability│
-│        │ │          │ │              │  │tenant/*     │
-│        │ │          │ │              │  │dashboard    │
+│        │ │rate_limit│ │              │  │ Phase 9.3:  │
+│        │ │input_val │ │              │  │Agent Registry│
+│        │ │          │ │              │  │capability   │
+│        │ │          │ │              │  │timeout_chk  │
+│        │ │          │ │              │  │             │
+│        │ │          │ │              │  │ Phase 9.2:  │
+│        │ │          │ │              │  │task_gen/*   │
+│        │ │          │ │              │  │task_verify/*│
+│        │ │          │ │              │  │             │
+│        │ │          │ │              │  │ Phase 9.4:  │
+│        │ │          │ │              │  │token_rate_l │
+│        │ │          │ │              │  │ws_rate_limit│
+│        │ │          │ │              │  │rate_limit_* │
 └────────┘ └──────────┘ └──────────────┘  └─────────────┘
 ```
 
@@ -220,19 +271,159 @@ draft ──(start)──→ discussing ──(start_voting)──→ voting ─
                        ↓           │
                 devils_advocate ────┘
               (devils_advocate_done → discussing)
+
+                          关闭后触发任务执行:
+                      ┌───────────────────┐
+                      │ Task Generator    │ → TaskGraph (DAG)
+                      └───────┬───────────┘
+                              ▼
+                      ┌───────────────────┐
+                      │ Task Assigner     │ → 能力匹配 + 轮询
+                      └───────┬───────────┘
+                              ▼
+                      ┌───────────────────┐
+                      │ Task Executor     │ → PENDING→ASSIGNED→RUNNING→DONE
+                      └───────┬───────────┘
+                              ▼
+                      ┌───────────────────┐
+                      │ Task Verifier     │ → ACCEPTED / REJECTED
+                      └───────────────────┘
 ```
 
 ## 关键设计决策
 
-1. **双协议通信**：REST API 用于 CRUD（创建议题、查结果），WebSocket 用于实时交互（发言、投票）
+1. **双协议通信**：REST API 用于 CRUD（创建议题、查结果），WebSocket 用于实时交互（发言、投票、任务执行）
 2. **状态机驱动**：所有状态转换通过 StateMachine 统一管理，确保转换合法性
 3. **投票策略模式**：voting/ 子系统通过 factory.py 按方法名创建投票策略实例
-4. **存储分层**：storage/ 按实体拆分模块（motions, votes, agents 等），统一通过 Storage 类访问
-5. **进化闭环**：curator 分析讨论结果，优化后续调度策略（何时推进投票、追问关键点）
+4. **存储分层**：storage/ 按实体拆分模块，统一通过 Storage 类访问
+5. **进化闭环**：curator 分析讨论结果，优化后续调度策略
 6. **客户端自动重连**：ws_pool.py 实现指数退避重连 + 请求-响应匹配
 7. **可观测性三支柱**：Metrics (Prometheus) + Events (结构化日志) + Traces (请求追踪)
 8. **多租户隔离**：per-tenant SQLite 实例，StorageManager 懒创建，默认租户保证向后兼容
 9. **轻量 Dashboard**：纯 HTML+JS 前端，通过 REST API + SSE 获取数据，Chart.js 渲染
+10. **任务执行引擎**：讨论关闭后自动生成 TaskGraph (DAG)，按能力匹配分配 agent，通过 WS 消息驱动任务生命周期
+11. **Agent 认证协议**：Token 认证（POST /register 获取 agent_token → WS 连接携带 token 验证），支持审批流（pending/approved）
+12. **Token Bucket 限速**：per-agent TPM 令牌桶，支持 burst（默认 1.5x），coordinator 跟踪 + client 本地预检双重保障
+
+## Phase 9.1: 平台独立化
+
+### 包结构
+
+原 `hermes-agora` 插件重构为独立的 `agora` Python 包：
+
+```
+agora/                      # pip install agora
+├── cli.py                  # agora serve / agora agent
+├── agora/coordinator/      # 调度中心
+├── agora/agent_client/     # 客户端库
+```
+
+### 部署模式
+
+| 模式 | 命令 | 用途 |
+|------|------|------|
+| 本地开发 | `agora serve` | 开发 Agora 本身 |
+| Docker | `docker run agora-coordinator` | 生产环境、CI |
+| docker-compose | `docker compose up` | 完整环境（coordinator + agents） |
+| pip install | `pip install agora` | 作为库导入使用 |
+
+### 配置文件
+
+通过 `config.yaml` + `config_defaults.yaml` 进行全局配置，环境变量可覆盖。关键配置项：
+
+- `coordinator.host/port` — 监听地址
+- `coordinator.db_path` — 数据库路径
+- `coordinator.require_approval` — 是否要求 agent 审批
+- `agent.tpm_limit` — 默认 TPM 限制
+
+## Phase 9.2: 任务执行引擎
+
+### 数据模型
+
+- **TaskNode**: 单个任务（id, title, description, status, assigned_to, required_capabilities, depends_on, artifact_paths）
+- **TaskGraph**: 任务 DAG（id, motion_id, tasks）
+- **TaskStatus**: PENDING → ASSIGNED → RUNNING → DONE → ACCEPTED/REJECTED，FAILED 终态
+
+### 核心流程
+
+1. **Task Generator** (`task_gen/`): 讨论关闭 → LLM 分解 action_items → TaskGraph（启发式降级）
+2. **Task Assigner** (`task_assign.py`): 能力匹配 → 轮询分配 → 尊重 max_concurrent_tasks
+3. **Task Executor** (`task_exec.py`): 状态机驱动，通过 WS 消息通信
+4. **Task Verifier** (`task_verify/`): 简单检查 → 自动接受 → 委托审查
+
+### WebSocket 任务消息
+
+| 消息类型 | 方向 | 说明 |
+|----------|------|------|
+| TASK_ASSIGNED | server→agent | 分配任务 |
+| TASK_STATUS | agent→server | 状态更新 (RUNNING/DONE/FAILED) |
+| TASK_COMPLETED | agent→server | 任务完成 |
+| TASK_FAILED | agent→server | 任务失败 |
+| TASK_VERIFY | server→reviewer | 委托审查 |
+| TASK_ACCEPT_RESULT | reviewer→server | 审查结果 |
+
+## Phase 9.3: Agent 注册协议
+
+### 注册流程
+
+```
+1. Agent → POST /api/v1/agents/register (含 agent_type, model, capabilities)
+2. Coordinator → 201 {agent_token, status: approved|pending}
+3. Agent → WS /ws/{agent_id}?token=ag-xxx
+4. Coordinator 验证 token → WELCOME (含 AgentConfig)
+5. Agent 定期发送 HEARTBEAT (30s) 更新 load + active_tasks
+```
+
+### 新增模型
+
+- **AgentType**: hermes | docker | cli | custom — Agent 连接类型
+- **AgentStatus**: pending | approved | rejected | suspended — 审批状态
+- **AgentConfig**: max_concurrent_tasks, heartbeat_interval, tpm_limit, tpm_burst_factor, auto_accept_tasks
+- **AgentRegistrationResponse**: agent_id, status, agent_token, message
+
+### 认证机制
+
+- 每个 agent 注册时获得唯一的 `agent_token`（UUID 格式）
+- WS 连接必须携带 token（query 参数或 header）
+- 支持 `AGORA_REQUIRE_APPROVAL` 环境变量切换审批模式
+- 默认 auto-approve（本地开发）；生产环境需审批
+
+### 心跳 + 在线追踪
+
+- HEARTBEAT 消息每 30 秒（可配）发送，携带 load (0.0-1.0) 和 active_tasks 列表
+- 120 秒无心跳 → agent 标记 offline
+- 心跳存入 `agent_heartbeat` 表，用于在线追踪和负载均衡
+
+## Phase 9.4: API 速率限制
+
+### Token Bucket 算法
+
+每个 agent 拥有独立的令牌桶：
+
+- **容量**: `tpm_limit * burst_factor`（默认 burst=1.5x）
+- **补充速率**: `tpm_limit / 60` tokens/秒
+- **消耗**: 每次 LLM 调用前 `consume(n)`，成功则放行，失败则 rate limited
+
+### 双重保障
+
+1. **Coordinator 端**: `TokenRateLimiter` 在内存中 tracking，通过 REST API 提供状态查询
+2. **Client 端**: `RateLimitTracker` 在 agent 端本地预检，避免无效 API 调用
+
+### API 端点
+
+```
+GET  /api/v1/agents/{id}/rate-limit       → 查询限制状态
+POST /api/v1/agents/{id}/rate-limit/report → 上报 token 消耗
+POST /api/v1/agents/{id}/rate-limit/check  → 预检 tokens 是否充足
+PATCH /api/v1/agents/{id}/rate-limit       → 管理员调整限制
+```
+
+### WebSocket 集成
+
+- `RATE_LIMIT_WARNING`: 80% 用量 → notify agent
+- `RATE_LIMITED`: 100% 用量 → block + 告知等待时间
+- `RATE_LIMIT_RESET`: 令牌恢复 → 通知可继续
+- `RATE_LIMIT_REPORT`: agent→coordinator 上报实际 token 消耗
 
 ## Phase 8: 可观测性
 
@@ -273,7 +464,7 @@ data/
 
 - `Tenant`: tenant_id, name, created_at, TenantConfig
 - `TenantConfig`: max_agents, max_concurrent_discussions, quality_threshold 等
-- `TenantResourceGuard`: 超 429 限制时抛出 HTTP 429
+- `TenantResourceGuard`: 超限时抛出 HTTP 429
 
 ### 向后兼容
 
