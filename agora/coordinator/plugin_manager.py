@@ -10,6 +10,7 @@ import logging
 from typing import Any, Callable
 
 from agora.coordinator.plugin import AgoraPlugin, HookContext, HookPoint, PluginManifest
+from agora.coordinator.plugin_discovery import discover_plugins, filter_plugins
 
 logger = logging.getLogger(__name__)
 
@@ -103,3 +104,18 @@ class PluginCoordinator:
             logger.warning("No handler for hook %s on plugin %s", hook, plugin.manifest.name)
             return
         self._hook_registry[hook].append(target)
+
+    async def reload_plugin(self, name: str) -> None:
+        """Unload then re-load a plugin by name."""
+        plugin = self._plugins.get(name)
+        if plugin is None:
+            logger.warning("Plugin %s not found for reload", name)
+            return
+        await self.unload_plugin(name)
+        await self.load_plugin(plugin)
+
+    def list_available_plugins(self) -> list[PluginManifest]:
+        """List manifests of discoverable but not-yet-loaded plugins."""
+        discovered = discover_plugins()
+        loaded_names = set(self._plugins.keys())
+        return [p.manifest for p in discovered if p.manifest.name not in loaded_names]

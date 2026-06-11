@@ -37,7 +37,7 @@ from .bootstrap.routes_extra import router as bootstrap_extra_router
 from .observability.metrics import init_metrics, metrics
 from .observability.trace import set_trace_id
 from .dashboard import router as dashboard_router
-from .dashboard import init_dashboard_deps
+from .dashboard import init_dashboard_deps, init_audit_deps
 from .token_rate_limiter import TokenRateLimiter
 from .rate_limit_flush import rate_limit_flush_task
 from .rate_limit_router import router as rate_limit_router
@@ -48,10 +48,23 @@ from .rate_limit_router2 import init_rate_limit_deps2
 from .rbac_middleware import RBACMiddleware
 from .plugin_discovery import discover_plugins, filter_plugins, validate_manifest
 from .plugin_manager import PluginCoordinator
+from .plugin_routes import router as plugin_router
+from .plugin_routes import init_plugin_route_deps
+from .plugin_routes_actions import router as plugin_action_router
+from .plugin_routes_actions import init_plugin_action_deps
 from .task_parallel import ParallelExecutionCoordinator
 from .task_resource import FileResourceTracker
 from .token_manager import TokenManager
 from .audit import AuditLogger
+from .dashboard_ws import dashboard_hub
+from .dashboard_ws_endpoint import dashboard_ws_endpoint
+# Phase 11.5a: Auth router + event bus
+from .auth_router import router as auth_router
+from .auth_router import init_auth_deps
+from .event_bus import init_event_bus
+# Phase 11.1b: Agent config routes
+from .agent_config_routes import router as agent_config_router
+from .agent_config_routes import init_agent_config_deps
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +114,9 @@ async def lifespan(app: FastAPI):
     timeout_mgr = TimeoutManager(config=timeout_cfg)
     app.state.heartbeat_mgr = heartbeat_mgr
     app.state.timeout_mgr = timeout_mgr
-    await heartbeat_mgr.start_heartbeat(interval=settings.heartbeat_interval_seconds)
+    await heartbeat_mgr.start_heartbeat(
+        interval=settings.heartbeat_interval_seconds,
+    )
     # Phase 9.3c: Start heartbeat timeout checker
     hb_timeout_task = asyncio.create_task(
         heartbeat_timeout_checker(
@@ -115,6 +130,14 @@ async def lifespan(app: FastAPI):
     audit_logger = AuditLogger(settings.db_path)
     app.state.token_mgr = token_mgr
     app.state.audit_logger = audit_logger
+    init_audit_deps(audit_logger)
+    # Phase 11.2b: Dashboard WS hub init
+    dashboard_hub.set_token_manager(token_mgr)
+    # Phase 11.5a: Auth deps + event bus init
+    init_auth_deps(token_mgr)
+    init_event_bus(dashboard_hub)
+    # Phase 11.1b: Agent config deps
+    init_agent_config_deps(storage, token_mgr)
     # Phase 10.1: Parallel execution coordinator
     resource_tracker = FileResourceTracker()
     parallel_coord = ParallelExecutionCoordinator(
@@ -136,6 +159,8 @@ async def lifespan(app: FastAPI):
         if validate_manifest(plugin):
             await plugin_coord.load_plugin(plugin)
     app.state.plugin_coord = plugin_coord
+    init_plugin_route_deps(plugin_coord)
+    init_plugin_action_deps(plugin_coord)
     logger.info(
         "Plugins loaded: %d/%d", len(plugin_coord.list_plugins()), len(discovered),
     )
@@ -198,7 +223,13 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router, prefix="/api/v1")
     app.include_router(rate_limit_router, prefix="/api/v1")
     app.include_router(rate_limit_router2, prefix="/api/v1")
+    app.include_router(plugin_router, prefix="/api/v1")
+    app.include_router(plugin_action_router, prefix="/api/v1")
+    app.include_router(auth_router, prefix="/api/v1")
+    app.include_router(agent_config_router, prefix="/api/v1")
     app.add_api_websocket_route("/ws/{agent_id}", websocket_endpoint)
+    # Phase 11.2b: Dashboard WebSocket endpoint
+    app.add_api_websocket_route("/ws/dashboard", dashboard_ws_endpoint)
     # Phase 8.2: tenant-scoped WS (backward compat via default tenant_id)
     # Dashboard static files
     static_dir = Path(__file__).parent / "static"

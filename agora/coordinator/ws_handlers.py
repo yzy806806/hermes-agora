@@ -81,7 +81,13 @@ async def handle_register(
             },
         },
     })
-    logger.info("Agent %s registered via WebSocket", agent_id)
+    logger.info("Agent %s registered via WebSocket")
+
+    # Phase 11.5a: Push to dashboard event bus
+    from .event_bus import publish
+    await publish("AGENT_ONLINE", {
+        "agent_id": agent_id, "name": name, "model": model,
+    }, channel="events")
 
 
 async def handle_heartbeat(
@@ -144,6 +150,14 @@ async def handle_speak(
         "motion_id": motion_id,
         "payload": {"delivered": True},
     })
+
+    # Phase 11.5a: Push to dashboard event bus
+    from .event_bus import publish
+    await publish("DISCUSSION_MESSAGE", {
+        "motion_id": motion_id, "agent_id": agent_id,
+        "round": round_num, "stance": stance,
+        "content": content,
+    }, channel="discussions")
 
     # Phase 2: check if round complete and assess
     await maybe_assess_round(motion_id, storage, sm, mgr)

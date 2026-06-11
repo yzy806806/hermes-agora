@@ -58,6 +58,16 @@ async def get_task_graph(
     return graph
 
 
+async def list_task_graphs(
+    db: aiosqlite.Connection,
+    limit: int = 100, offset: int = 0,
+) -> list[dict]:
+    """List all task graphs (without tasks)."""
+    sql = "SELECT * FROM task_graphs LIMIT ? OFFSET ?"
+    async with db.execute(sql, [limit, offset]) as cur:
+        return [dict(r) async for r in cur]
+
+
 async def get_task_graph_by_motion(
     db: aiosqlite.Connection, motion_id: str
 ) -> Optional[dict]:

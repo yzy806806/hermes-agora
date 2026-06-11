@@ -1,0 +1,51 @@
+/* App entry point — SPA router + nav handling (auth in auth.js) */
+import { auth } from './auth.js';
+
+let currentPage = null;
+const pages = {};
+
+async function loadPageModule(name) {
+  if (!pages[name]) pages[name] = await import(`./pages/${name}.js`);
+  return pages[name];
+}
+
+async function navigate(page) {
+  if (currentPage) {
+    const mod = await loadPageModule(currentPage);
+    mod.unmount?.();
+  }
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('#nav a').forEach(a => a.classList.remove('active'));
+  const pageEl = document.getElementById(page);
+  const navEl = document.querySelector(`#nav a[data-page="${page}"]`);
+  if (pageEl) pageEl.classList.add('active');
+  if (navEl) navEl.classList.add('active');
+  currentPage = page;
+  const mod = await loadPageModule(page);
+  mod.mount(pageEl);
+  location.hash = page;
+}
+
+function init() {
+  document.querySelectorAll('#nav a[data-page]').forEach(a => {
+    a.addEventListener('click', e => { e.preventDefault(); navigate(a.dataset.page); });
+  });
+  window.addEventListener('hashchange', () => {
+    const page = location.hash.slice(1) || 'overview';
+    if (page !== currentPage) navigate(page);
+  });
+  document.getElementById('login-form')?.addEventListener('submit', e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    auth.login(fd.get('username'), fd.get('password'))
+      .then(() => navigate('overview'))
+      .catch(err => alert(err.message));
+  });
+  document.getElementById('btn-logout')?.addEventListener('click', () => {
+    auth.logout();
+  });
+  auth.checkAuth();
+  navigate(location.hash.slice(1) || 'overview');
+}
+
+export const app = { init, navigate, getUserRole: auth.getUserRole };

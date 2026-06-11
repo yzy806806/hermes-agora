@@ -413,3 +413,36 @@ class TimelineEntry(BaseModel):
     agent_id: Optional[str] = None
     content: str = ""
     round_num: Optional[int] = None
+
+
+# ---------------------------------------------------------------------------
+# Phase 11.1b: Agent Config & Token Rotation Models
+# ---------------------------------------------------------------------------
+
+
+class AgentConfigUpdate(BaseModel):
+    """Request body for PUT /admin/agents/{agent_id}/config."""
+
+    tpm_limit: Optional[int] = Field(None, ge=1)
+    tpm_burst_factor: Optional[float] = Field(None, ge=1.0, le=3.0)
+    max_concurrent_tasks: Optional[int] = Field(None, ge=1, le=100)
+    role: Optional[str] = None
+    allowed_discussion_roles: Optional[list[str]] = None
+
+
+class AgentConfigResponse(BaseModel):
+    """Response for PUT /admin/agents/{agent_id}/config."""
+
+    agent_id: str
+    tpm_limit: int
+    tpm_burst_factor: float
+    max_concurrent_tasks: int
+    role: str
+    allowed_discussion_roles: list[str] = Field(default_factory=list)
+
+
+class TokenRotateResponse(BaseModel):
+    """Response for POST /admin/agents/{agent_id}/token."""
+
+    agent_id: str
+    agent_token: str

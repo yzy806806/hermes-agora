@@ -27,7 +27,7 @@ from . import votes as _votes
 from . import parallel as _parallel
 from . import rbac as _rbac
 from . import tokens as _tokens
-from .schema import SCHEMA_SQL, SCHEMA_VERSION, MIGRATION_6_TO_7, MIGRATION_7_TO_8, MIGRATION_8_TO_9
+from .schema import SCHEMA_SQL, SCHEMA_VERSION, MIGRATION_6_TO_7, MIGRATION_7_TO_8, MIGRATION_8_TO_9, MIGRATION_9_TO_10
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +80,12 @@ class Storage:
                     await db.execute(stmt)
                 logger.info(
                     "Applied migration 8→9 (Phase 10 parallel + RBAC)")
+
+            if current_ver < 10:
+                for stmt in MIGRATION_9_TO_10:
+                    await db.execute(stmt)
+                logger.info(
+                    "Applied migration 9→10 (Phase 11.1b agent config)")
 
             await db.execute(
                 "INSERT OR IGNORE INTO schema_version VALUES (?, ?)",
@@ -157,6 +163,36 @@ class Storage:
         async with self._connection() as db:
             await _agents.update_agent_tpm_config(
                 db, agent_id, tpm_limit, tpm_burst_factor)
+
+    async def update_agent_config(
+        self, agent_id: str, *,
+        tpm_limit: int | None = None,
+        tpm_burst_factor: float | None = None,
+        max_concurrent_tasks: int | None = None,
+        role: str | None = None,
+        allowed_discussion_roles: list[str] | None = None,
+    ) -> None:
+        """Persist agent config to DB (Phase 11.1b)."""
+        async with self._connection() as db:
+            await _agents.update_agent_config(
+                db, agent_id,
+                tpm_limit=tpm_limit,
+                tpm_burst_factor=tpm_burst_factor,
+                max_concurrent_tasks=max_concurrent_tasks,
+                role=role,
+                allowed_discussion_roles=allowed_discussion_roles,
+            )
+
+    async def update_agent_token(
+        self, agent_id: str, new_token: str,
+    ) -> None:
+        """Replace agent_token in DB (Phase 11.1b token rotation)."""
+        async with self._connection() as db:
+            await db.execute(
+                "UPDATE agents SET agent_token = ? WHERE agent_id = ?",
+                [new_token, agent_id],
+            )
+            await db.commit()
 
     # --- Motion CRUD ---
 
@@ -420,6 +456,12 @@ class Storage:
     async def get_task_graph(self, graph_id: str) -> Optional[dict]:
         async with self._connection() as db:
             return await _tasks.get_task_graph(db, graph_id)
+
+    async def list_task_graphs(
+        self, limit: int = 100, offset: int = 0,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _tasks.list_task_graphs(db, limit, offset)
 
     async def get_task_graph_by_motion(
         self, motion_id: str

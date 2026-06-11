@@ -29,6 +29,16 @@ from .models import (
     MotionStatus,
     VotingMethod,
 )
+from .dashboard_models import (
+    ExecutionSlotItem,
+    ExecutionSlotsResponse,
+    TaskDetailResponse,
+    TaskGraphDetailResponse,
+    TaskGraphItem,
+    TaskGraphListResponse,
+    TaskItem,
+    TaskListResponse,
+)
 from .rbac import Permission, Role, get_current_role, requires
 from .state import InvalidTransitionError, StateMachine
 from .storage import Storage
@@ -318,6 +328,11 @@ async def start_motion(
             "payload": motion,
         }
     )
+    # Phase 11.5a: Push to dashboard event bus
+    from .event_bus import publish
+    await publish("MOTION_STATUS", {
+        "motion_id": motion_id, "status": new_status.value,
+    }, channel="discussions")
     return {"status": "started", "current_status": new_status.value}
 
 
@@ -423,3 +438,97 @@ async def force_vote(
         },
     })
     return {"status": "voting_started", "current_status": new_status.value}
+
+
+# ---------------------------------------------------------------------------
+# Phase 11.1a: Task Query API (Dashboard)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/tasks", response_model=TaskListResponse)
+@requires(Permission.CONFIG_READ)
+async def list_tasks_api(
+    graph_id: Optional[str] = None,
+    status: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    _rbac_role: Role | None = Depends(get_current_role),
+) -> TaskListResponse:
+    """List tasks with optional filters."""
+    storage = _get_storage()
+    tasks = await storage.list_tasks(
+        graph_id=graph_id, status=status,
+        agent_id=agent_id, limit=limit, offset=offset,
+    )
+    items = [TaskItem(**t) for t in tasks]
+    return TaskListResponse(
+        tasks=items, total=len(items), limit=limit, offset=offset)
+
+
+@router.get("/tasks/{task_id}", response_model=TaskDetailResponse)
+@requires(Permission.CONFIG_READ)
+async def get_task_detail(
+    task_id: str,
+    _rbac_role: Role | None = Depends(get_current_role),
+) -> TaskDetailResponse:
+    """Get single task detail."""
+    storage = _get_storage()
+    task = await storage.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return TaskDetailResponse(**task)
+
+
+@router.get("/task-graphs", response_model=TaskGraphListResponse)
+@requires(Permission.CONFIG_READ)
+async def list_task_graphs_api(
+    limit: int = 100,
+    offset: int = 0,
+    _rbac_role: Role | None = Depends(get_current_role),
+) -> TaskGraphListResponse:
+    """List all task graphs."""
+    storage = _get_storage()
+    graphs = await storage.list_task_graphs(limit=limit, offset=offset)
+    items = [TaskGraphItem(**g) for g in graphs]
+    return TaskGraphListResponse(
+        graphs=items, total=len(items), limit=limit, offset=offset)
+
+
+@router.get("/task-graphs/{graph_id}",
+            response_model=TaskGraphDetailResponse)
+@requires(Permission.CONFIG_READ)
+async def get_task_graph_detail(
+    graph_id: str,
+    _rbac_role: Role | None = Depends(get_current_role),
+) -> TaskGraphDetailResponse:
+    """Get graph with all tasks."""
+    storage = _get_storage()
+    graph = await storage.get_task_graph(graph_id)
+    if graph is None:
+        raise HTTPException(
+            status_code=404, detail="Task graph not found")
+    tasks = [TaskDetailResponse(**t) for t in graph.get("tasks", [])]
+    return TaskGraphDetailResponse(
+        id=graph["id"], motion_id=graph["motion_id"],
+        parallel_mode=graph.get("parallel_mode", "auto"),
+        max_parallel_slots=graph.get("max_parallel_slots", 10),
+        resource_conflict_policy=graph.get(
+            "resource_conflict_policy", "warn"),
+        created_at=graph.get("created_at"),
+        tasks=tasks)
+
+
+@router.get("/execution-slots", response_model=ExecutionSlotsResponse)
+@requires(Permission.CONFIG_READ)
+async def get_execution_slots_api(
+    agent_id: Optional[str] = None,
+    status: Optional[str] = None,
+    _rbac_role: Role | None = Depends(get_current_role),
+) -> ExecutionSlotsResponse:
+    """Current execution slot status."""
+    storage = _get_storage()
+    slots = await storage.get_execution_slots(
+        agent_id=agent_id, status=status)
+    items = [ExecutionSlotItem(**s) for s in slots]
+    return ExecutionSlotsResponse(slots=items, total=len(items))

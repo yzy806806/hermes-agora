@@ -69,6 +69,12 @@ async def handle_task_status(
         error_message=payload.get("error"),
         artifact_paths=payload.get("artifact_paths"),
     )
+    # Phase 11.5a: Push to dashboard event bus
+    from .event_bus import publish
+    await publish("TASK_STATUS", {
+        "task_id": task_id, "status": new_status,
+        "agent_id": agent_id, "motion_id": task.get("motion_id"),
+    }, channel="tasks")
     if new_status == "done":
         from .task_verify import verify_task
         await verify_task(task_id, storage, hub)

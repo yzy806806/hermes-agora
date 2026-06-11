@@ -87,8 +87,9 @@ class AuditLogger:
         since: Optional[datetime] = None,
         until: Optional[datetime] = None,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[dict]:
-        """Search audit log with filters."""
+        """Search audit log with filters + pagination."""
         clauses: list[str] = []
         params: list = []
 
@@ -113,13 +114,55 @@ class AuditLogger:
 
         where = " AND ".join(clauses) if clauses else "1=1"
         params.append(limit)
+        params.append(offset)
 
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 f"SELECT * FROM audit_log WHERE {where} "
-                f"ORDER BY timestamp DESC LIMIT ?",
+                f"ORDER BY timestamp DESC LIMIT ? OFFSET ?",
                 params,
             ) as cursor:
                 rows = await cursor.fetchall()
                 return [dict(r) for r in rows]
+
+    async def count_events(
+        self,
+        actor_id: Optional[str] = None,
+        action: Optional[str] = None,
+        event_type: Optional[AuditEventType] = None,
+        tenant_id: Optional[str] = None,
+        since: Optional[datetime] = None,
+        until: Optional[datetime] = None,
+    ) -> int:
+        """Count audit events matching filters (for pagination total)."""
+        clauses: list[str] = []
+        params: list = []
+
+        if actor_id is not None:
+            clauses.append("actor_id = ?")
+            params.append(actor_id)
+        if action is not None:
+            clauses.append("action = ?")
+            params.append(action)
+        if event_type is not None:
+            clauses.append("event_type = ?")
+            params.append(event_type.value)
+        if tenant_id is not None:
+            clauses.append("tenant_id = ?")
+            params.append(tenant_id)
+        if since is not None:
+            clauses.append("timestamp >= ?")
+            params.append(since.isoformat())
+        if until is not None:
+            clauses.append("timestamp <= ?")
+            params.append(until.isoformat())
+
+        where = " AND ".join(clauses) if clauses else "1=1"
+
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute(
+                f"SELECT COUNT(*) FROM audit_log WHERE {where}", params,
+            ) as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row else 0

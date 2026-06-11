@@ -82,6 +82,13 @@ async def handle_vote(
         "payload": {"vote": vote_value, "agent_id": agent_id},
     })
 
+    # Phase 11.5a: Push to dashboard event bus
+    from .event_bus import publish
+    await publish("VOTE_CAST", {
+        "motion_id": motion_id, "agent_id": agent_id,
+        "vote": vote_value, "confidence": confidence,
+    }, channel="discussions")
+
     # Check if all online agents have voted
     await _check_all_voted(motion_id, storage, sm, mgr)
 

@@ -79,6 +79,8 @@ async def get_agent(
             d["capabilities"] = json.loads(d["capabilities"])
         if "active_tasks" in d and isinstance(d["active_tasks"], str):
             d["active_tasks"] = json.loads(d["active_tasks"])
+        if "allowed_discussion_roles" in d and isinstance(d["allowed_discussion_roles"], str):
+            d["allowed_discussion_roles"] = json.loads(d["allowed_discussion_roles"])
         return d
 
 
@@ -99,6 +101,8 @@ async def get_agent_by_token(
             d["capabilities"] = json.loads(d["capabilities"])
         if "active_tasks" in d and isinstance(d["active_tasks"], str):
             d["active_tasks"] = json.loads(d["active_tasks"])
+        if "allowed_discussion_roles" in d and isinstance(d["allowed_discussion_roles"], str):
+            d["allowed_discussion_roles"] = json.loads(d["allowed_discussion_roles"])
         return d
 
 
@@ -119,6 +123,8 @@ async def list_agents(
             d["capabilities"] = json.loads(d["capabilities"])
         if "active_tasks" in d and isinstance(d["active_tasks"], str):
             d["active_tasks"] = json.loads(d["active_tasks"])
+        if "allowed_discussion_roles" in d and isinstance(d["allowed_discussion_roles"], str):
+            d["allowed_discussion_roles"] = json.loads(d["allowed_discussion_roles"])
     return rows
 
 
@@ -180,6 +186,43 @@ async def update_agent_tpm_config(
     if tpm_burst_factor is not None:
         parts.append("tpm_burst_factor = ?")
         params.append(tpm_burst_factor)
+    if not parts:
+        return
+    params.append(agent_id)
+    await db.execute(
+        f"UPDATE agents SET {', '.join(parts)} WHERE agent_id = ?",
+        params,
+    )
+    await db.commit()
+
+
+async def update_agent_config(
+    db: aiosqlite.Connection,
+    agent_id: str,
+    *,
+    tpm_limit: int | None = None,
+    tpm_burst_factor: float | None = None,
+    max_concurrent_tasks: int | None = None,
+    role: str | None = None,
+    allowed_discussion_roles: list[str] | None = None,
+) -> None:
+    """Update agent config fields. Only updates provided fields."""
+    parts, params = [], []
+    if tpm_limit is not None:
+        parts.append("tpm_limit = ?")
+        params.append(tpm_limit)
+    if tpm_burst_factor is not None:
+        parts.append("tpm_burst_factor = ?")
+        params.append(tpm_burst_factor)
+    if max_concurrent_tasks is not None:
+        parts.append("max_concurrent_tasks = ?")
+        params.append(max_concurrent_tasks)
+    if role is not None:
+        parts.append("role = ?")
+        params.append(role)
+    if allowed_discussion_roles is not None:
+        parts.append("allowed_discussion_roles = ?")
+        params.append(json.dumps(allowed_discussion_roles))
     if not parts:
         return
     params.append(agent_id)

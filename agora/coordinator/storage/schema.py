@@ -1,6 +1,6 @@
 """SQL schema definitions for the Agora Coordinator database."""
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 SCHEMA_SQL = """\
 PRAGMA foreign_keys = ON;
@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS agents (
     load REAL DEFAULT 0.0,
     active_tasks TEXT DEFAULT '[]',
     tpm_limit INTEGER DEFAULT 10000,
-    tpm_burst_factor REAL DEFAULT 1.5
+    tpm_burst_factor REAL DEFAULT 1.5,
+    allowed_discussion_roles TEXT DEFAULT '["participant"]'
 );
 
 CREATE TABLE IF NOT EXISTS motions (
@@ -389,6 +390,11 @@ MIGRATION_8_TO_9 = [
     "CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(tenant_id, actor_id);",
     "CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_log(tenant_id, timestamp);",
     "CREATE INDEX IF NOT EXISTS idx_audit_event ON audit_log(event_type);",
+]
+
+# Phase 11.1b: Agent config column (schema version 9 → 10)
+MIGRATION_9_TO_10 = [
+    "ALTER TABLE agents ADD COLUMN allowed_discussion_roles TEXT DEFAULT '[\"participant\"]';",
 ]
 
 # Default RBAC roles to seed on fresh DB

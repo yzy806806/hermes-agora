@@ -55,6 +55,7 @@ RUN uv pip install --system \
     fastapi>=0.110 uvicorn>=0.29 websockets>=12.0 \
     pydantic>=2.0 pydantic-settings>=2.0 aiosqlite>=0.20 \
     httpx>=0.27 aiohttp>=3.9 prometheus-client>=0.20 pyyaml>=6.0 \
+    pyjwt>=2.8 packaging>=24.0 \
     pytest>=8.0 pytest-asyncio>=0.23 pytest-timeout>=2.2
 
 # Copy source code and tests

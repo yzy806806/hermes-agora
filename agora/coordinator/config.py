@@ -102,6 +102,10 @@ class Settings(BaseSettings):
     rbac_enforce: bool = False            # env: AGORA_RBAC_ENFORCE
     jwt_secret: str = ""                  # env: AGORA_JWT_SECRET
 
+    # Phase 11.2: Dashboard auth (env: AGORA_DASHBOARD_USERS)
+    # Format: "username:hashedpassword,username2:hashedpassword2"
+    dashboard_users: str = ""
+
     # Phase 10.3: Plugin configuration
     plugins_enabled: list[str] = Field(default_factory=list)   # whitelist
     plugins_disabled: list[str] = Field(default_factory=list)  # blacklist

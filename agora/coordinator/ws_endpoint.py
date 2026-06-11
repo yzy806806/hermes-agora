@@ -259,4 +259,9 @@ async def on_agent_disconnect(agent_id: str, hub) -> None:
         "type": MessageType.AGENT_OFFLINE,
         "agent_id": agent_id,
     })
+    # Phase 11.5a: Push to dashboard event bus
+    from .event_bus import publish
+    await publish("AGENT_OFFLINE", {
+        "agent_id": agent_id, "reason": "timeout",
+    }, channel="events")
     logger.info("Agent %s went offline", agent_id)
