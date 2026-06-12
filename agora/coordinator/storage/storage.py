@@ -16,18 +16,21 @@ import aiosqlite
 from . import agents as _agents
 from . import agent_heartbeat as _agent_hb
 from . import assessments as _assessments
+from . import artifacts as _artifacts
 from . import bootstrap as _bootstrap
 from . import bootstrap_approval as _bootstrap_approval
 from . import events as _events
 from . import judgments as _judgments
 from . import messages as _messages
 from . import motions as _motions
+from . import sessions as _sessions
 from . import tasks as _tasks
 from . import votes as _votes
 from . import parallel as _parallel
 from . import rbac as _rbac
 from . import tokens as _tokens
-from .schema import SCHEMA_SQL, SCHEMA_VERSION, MIGRATION_6_TO_7, MIGRATION_7_TO_8, MIGRATION_8_TO_9, MIGRATION_9_TO_10
+from . import sessions as _sessions
+from .schema import SCHEMA_SQL, SCHEMA_VERSION, MIGRATION_6_TO_7, MIGRATION_7_TO_8, MIGRATION_8_TO_9, MIGRATION_9_TO_10, MIGRATION_10_TO_11
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +89,12 @@ class Storage:
                     await db.execute(stmt)
                 logger.info(
                     "Applied migration 9→10 (Phase 11.1b agent config)")
+
+            if current_ver < 11:
+                for stmt in MIGRATION_10_TO_11:
+                    await db.execute(stmt)
+                logger.info(
+                    "Applied migration 10→11 (Phase 12.5a session_records)")
 
             await db.execute(
                 "INSERT OR IGNORE INTO schema_version VALUES (?, ?)",
@@ -663,3 +672,89 @@ class Storage:
             return await _tokens.list_tokens(
                 db, principal_id=principal_id,
                 include_revoked=include_revoked)
+
+    # --- Session CRUD (Phase 12.5a) ---
+
+    async def create_session(
+        self, agent_id: str, project_id: str = "default",
+        session_type: str = "task_execution",
+        started_at: str | None = None,
+        ended_at: str | None = None,
+        input_messages: list | None = None,
+        output_messages: list | None = None,
+        tool_calls: list | None = None,
+        errors: list | None = None,
+        outcome: str = "success",
+        metadata: dict | None = None,
+    ) -> dict:
+        async with self._connection() as db:
+            return await _sessions.create_session(
+                db, agent_id, project_id=project_id,
+                session_type=session_type,
+                started_at=started_at, ended_at=ended_at,
+                input_messages=input_messages,
+                output_messages=output_messages,
+                tool_calls=tool_calls, errors=errors,
+                outcome=outcome, metadata=metadata)
+
+    async def get_session(self, sid: str) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _sessions.get_session(db, sid)
+
+    async def query_sessions(
+        self, agent_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        limit: int = 100, offset: int = 0,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _sessions.list_sessions(
+                db, agent_id=agent_id,
+                project_id=project_id,
+                limit=limit, offset=offset)
+
+    async def update_session(
+        self, sid: str, updates: dict,
+    ) -> Optional[dict]:
+        """Update fields on a session record."""
+        async with self._connection() as db:
+            return await _sessions.update_session(db, sid, updates)
+
+    async def add_session_note(
+        self, sid: str, author: str,
+        content: str, tags: list[str] | None = None,
+    ) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _sessions.add_note(
+                db, sid, author, content, tags=tags)
+
+    # --- Artifact CRUD (Phase 12.5a) ---
+
+    async def put_artifact(
+        self, project_id: str, key: str,
+        value: bytes, content_type: str, created_by: str,
+    ) -> dict:
+        async with self._connection() as db:
+            return await _artifacts.put_artifact(
+                db, project_id, key, value,
+                content_type, created_by)
+
+    async def get_artifact(
+        self, project_id: str, key: str,
+    ) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _artifacts.get_artifact(
+                db, project_id, key)
+
+    async def delete_artifact(
+        self, project_id: str, key: str,
+    ) -> bool:
+        async with self._connection() as db:
+            return await _artifacts.delete_artifact(
+                db, project_id, key)
+
+    async def list_artifacts(
+        self, project_id: str,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _artifacts.list_artifacts(
+                db, project_id)

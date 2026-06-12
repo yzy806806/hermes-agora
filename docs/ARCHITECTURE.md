@@ -1,6 +1,6 @@
 # Agora 架构文档
 
-> 版本: v0.10.0 | 最后更新: 2026-06-10
+> 版本: v0.12.0 | 最后更新: 2026-06-11
 
 ## 整体架构
 
@@ -54,10 +54,10 @@
         ┌────────────────────────┼────────────────────────┐
         ↓                        ↓                        ↓
    ┌─────────┐            ┌─────────┐            ┌─────────┐
-   │ Hermes  │            │ Docker  │            │ Custom  │
-   │ Agent   │            │ Agent   │            │ HTTP    │
-   │ (agora- │            │ (agora- │            │ Agent   │
-   │  client)│            │  client)│            │         │
+   │ Hermes  │            │ CLI     │            │ Custom  │
+   │ Bridge  │            │ Bridge  │            │ HTTP    │
+   │ (SDK +  │            │ (PTY +  │            │ Agent   │
+   │ adapter)│            │ ToolAdp)│            │         │
    └─────────┘            └─────────┘            └─────────┘
 ```
 
@@ -229,6 +229,7 @@ agora/
 || 10.1 | 并行任务执行 | task_parallel, task_resource, ExecutionSlot, ResourceLock | DAG 依赖并行执行 + 文件资源冲突检测 ||
 || 10.2 | RBAC 权限控制 | rbac, token_manager, audit, Role, Permission, @requires | 角色权限 + JWT Token + 审计日志 ||
 || 10.3 | 插件生态 | plugin, plugin_manager, plugin_discovery, plugin_sandbox, plugin_extensions | Hook 系统 + 入口点发现 + 沙箱隔离 ||
+|| 12 | 多平台 Agent 集成 | packages/agora-agent-sdk, packages/hermes-bridge, packages/cli-bridge, packages/agora-agent-sdk-js | Agent SDK + Hermes/CLI Bridge + Node.js SDK + Session 持久化 ||
 
 ## 模块关系图
 
@@ -329,6 +330,11 @@ draft ──(start)──→ discussing ──(start_voting)──→ voting ─
 13. **并行任务执行**：ParallelExecutionCoordinator 从 runqueue 分配任务，尊重 DAG 依赖和 per-agent 执行槽位上限，FileResourceTracker 检测文件级冲突并序列化
 14. **RBAC 权限控制**：五角色体系（SUPERADMIN/ADMIN/AGENT/OBSERVER/PLUGIN）+ 15 细粒度权限，@requires 装饰器绑定端点，JWT Token 支持创建/轮换/撤销/作用域限定，审计日志追踪所有安全事件
 15. **插件生态**：HookPoint 定义 20+ 生命周期事件（discussion/task/agent/system），AgoraPlugin ABC + PluginManifest，入口点发现（pip install），PluginCoordinator 管理加载/卸载/hook 触发，PluginSandbox 提供超时+导入限制
+16. **Agent SDK 独立包**：`agora-agent-sdk` 与 coordinator 解耦，agent 无需安装完整 Agora，仅依赖 httpx + pydantic
+17. **Hermes Bridge 守护进程**：不修改 Hermes 本身，桥接层翻译 kanban↔Agora WS 消息，支持多 profile 同时注册
+18. **CLI Bridge PTY 模式**：不修改 CLI agent 本身，PTY 子进程 + ToolAdapter 统一不同工具调用格式
+19. **Session 持久化在 Agora**：agent 通过 API 查询自身历史，不替代 agent 自身的 memory 机制
+20. **制品存储为简单 KV**：足够存 conventions/notes/findings，大型制品留在 git/project 中
 
 ## Phase 9.1: 平台独立化
 
@@ -556,3 +562,75 @@ WebSocket 通过 `?tenant_id=` 参数隔离连接。
 ### 扩展点
 
 插件可注册：自定义投票方法、自定义任务验证器、自定义 REST API 端点、自定义讨论策略
+
+## Phase 12: Multi-platform Agent Integration
+
+### Agent SDK (Python)
+
+独立 pip 包 `agora-agent-sdk`，位于 `packages/agora-agent-sdk/`。
+
+```
+agora-agent-sdk/
+├── src/agora_agent_sdk/
+│   ├── __init__.py         # 公共 API
+│   ├── client.py           # AgoraAgentClient 主类
+│   ├── client_lifecycle.py # register/connect/disconnect
+│   ├── client_methods.py   # speak/vote/task 方法
+│   ├── client_tasks.py     # 任务生命周期报告
+│   ├── run_loop.py         # WS 事件循环
+│   ├── protocol.py         # MessageType + WS 消息模型
+│   ├── config.py           # AgentConnectionConfig
+│   ├── bridge.py           # AbstractBridge ABC
+│   ├── discussion.py       # 讨论辅助方法
+│   ├── tool_adapter.py     # ToolAdapter 工具调用转换
+│   └── session.py          # SessionStore 本地持久化
+└── tests/
+```
+
+**关键区别**: SDK 不依赖 FastAPI/agora 包，仅 httpx + pydantic。
+
+### Hermes Bridge
+
+位于 `packages/hermes-bridge/`，守护进程翻译 kanban↔Agora WS 消息。
+
+```
+hermes-bridge/
+├── src/agora_hermes_bridge/
+│   ├── adapter.py   # HermesAdapter (implements AbstractBridge)
+│   ├── daemon.py    # 守护进程主循环
+│   ├── polling.py   # 轮询 Hermes kanban 状态
+│   ├── config.py    # 桥接配置
+│   ├── cli.py       # CLI 入口
+│   └── main.py      # 启动逻辑
+└── tests/
+```
+
+**设计决策**: 不修改 Hermes 本身，桥接层翻译消息。
+
+### CLI Bridge
+
+位于 `packages/cli-bridge/`，PTY 子进程管理 + ToolAdapter。
+
+```
+cli-bridge/
+├── src/agora_cli_bridge/
+│   ├── pty_manager.py        # PTY 子进程管理
+│   └── adapters/
+│       ├── base.py           # BaseAdapter ABC
+│       ├── codex_adapter.py  # Codex 适配器
+│       └── claude_adapter.py # Claude Code 适配器
+└── tests/
+```
+
+### Node.js SDK
+
+位于 `packages/agora-agent-sdk-js/`，npm 包 `@agora/agent-sdk`。
+
+- TypeScript 实现，依赖 ws + undici
+- 提供 AgoraAgentClient 类，事件驱动 API
+
+### Session Persistence
+
+- **SessionRecord**: agent 会话完整记录（输入/输出/工具调用/错误/结果）
+- **ProjectArtifact**: 项目级 KV 存储（conventions/notes/findings）
+- Agent 通过 REST API 查询历史，Agora 不替代 agent 自身 memory

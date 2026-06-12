@@ -446,3 +446,59 @@ class TokenRotateResponse(BaseModel):
 
     agent_id: str
     agent_token: str
+
+
+# ---------------------------------------------------------------------------
+# Phase 12.5: Session Persistence Models
+# ---------------------------------------------------------------------------
+
+
+class SessionCreateRequest(BaseModel):
+    """Request body for POST /api/v1/sessions."""
+
+    agent_id: str
+    project_id: str = "default"
+    session_type: str = "task_execution"
+    started_at: Optional[str] = None
+    ended_at: Optional[str] = None
+    input_messages: list[dict[str, Any]] = Field(default_factory=list)
+    output_messages: list[dict[str, Any]] = Field(default_factory=list)
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+    errors: list[dict[str, Any]] = Field(default_factory=list)
+    outcome: str = "success"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SessionRecord(BaseModel):
+    """A single session record returned by the API."""
+
+    id: str
+    agent_id: str
+    project_id: str = "default"
+    session_type: str = "task_execution"
+    started_at: str
+    ended_at: Optional[str] = None
+    input_messages: list[dict[str, Any]] = Field(default_factory=list)
+    output_messages: list[dict[str, Any]] = Field(default_factory=list)
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+    errors: list[dict[str, Any]] = Field(default_factory=list)
+    outcome: str = "success"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    notes: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class SessionListResponse(BaseModel):
+    """Paginated session list response."""
+
+    sessions: list[SessionRecord]
+    total: int
+    limit: int
+    offset: int
+
+
+class SessionNoteRequest(BaseModel):
+    """Request body for POST /api/v1/sessions/{id}/notes."""
+
+    author: str
+    content: str
+    tags: list[str] = Field(default_factory=list)

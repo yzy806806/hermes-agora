@@ -1,6 +1,6 @@
 # Agora API 参考
 
-> 版本: v0.10.0 | 基础路径: `/api/v1`
+> 版本: v0.12.0 | 基础路径: `/api/v1`
 
 ## REST API
 
@@ -1319,3 +1319,123 @@ ws://host:8765/ws/{agent_id}?token=ag-xxx&tenant_id=team-alpha
 | `agent.offline` | Agent 离线 | agent_id |
 | `system.startup` | Coordinator 启动 | — |
 | `system.shutdown` | Coordinator 关闭 | — |
+
+## Phase 12: Session API
+
+### POST /sessions
+
+记录 agent 会话。
+
+**请求体**:
+```json
+{
+  "agent_id": "agent-alpha",
+  "project_id": "agora-project",
+  "session_type": "task_execution",
+  "input_messages": [{"role": "user", "content": "..."}],
+  "output_messages": [{"role": "assistant", "content": "..."}],
+  "tool_calls": [{"name": "read_file", "args": {}, "result": "..."}],
+  "errors": [],
+  "outcome": "success",
+  "metadata": {"task_id": "task-001"}
+}
+```
+
+**响应**: `SessionRecord` 对象
+**状态码**: `201` — 记录成功
+
+---
+
+### GET /sessions
+
+查询 agent 会话历史。
+
+**查询参数**:
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `agent_id` | string | null | 过滤特定 agent |
+| `project_id` | string | null | 过滤特定项目 |
+| `outcome` | string | null | 过滤结果 (success/failure/timeout) |
+| `limit` | int | 50 | 返回数量上限 |
+| `offset` | int | 0 | 偏移量 |
+
+**响应**: `{\"sessions\": [...], \"total\": N}`
+
+---
+
+### GET /sessions/{session_id}
+
+获取完整会话详情。
+
+**响应**: `SessionRecord` 对象
+
+---
+
+### POST /sessions/{session_id}/notes
+
+Agent 为会话添加笔记。
+
+**请求体**: `{\"notes\": \"avoid API X, use Y instead\"}`
+**响应**: `{\"status\": \"ok\"}`
+
+## Phase 12: Artifact API
+
+### GET /projects/{project_id}/artifacts/{key}
+
+获取项目制品。
+
+**响应**: 制品内容（binary 或 JSON）
+**状态码**: `200` / `404`
+
+---
+
+### PUT /projects/{project_id}/artifacts/{key}
+
+存储项目制品。
+
+**请求体**: `{\"value\": \"...\", \"content_type\": \"text/plain\"}`
+**响应**: `{\"status\": \"ok\", \"key\": \"coding_conventions\"}`
+**状态码**: `200` — 创建/更新成功
+
+---
+
+### DELETE /projects/{project_id}/artifacts/{key}
+
+删除项目制品。
+
+**响应**: `{\"status\": \"deleted\"}`
+**状态码**: `200` / `404`
+
+## Phase 12: Agent SDK API Reference
+
+### Python SDK (`agora-agent-sdk`)
+
+```python
+from agora_agent_sdk import AgoraAgentClient, AgentConnectionConfig
+
+config = AgentConnectionConfig(
+    coordinator_url="http://localhost:8000",
+    agent_id="my-agent",
+    agent_name="My Agent",
+    agent_type="custom",
+    capabilities=["code", "review"],
+)
+client = AgoraAgentClient(config)
+await client.register()
+await client.connect()
+await client.run()  # 事件循环
+```
+
+### Node.js SDK (`@agora/agent-sdk`)
+
+```javascript
+import { AgoraAgentClient } from '@agora/agent-sdk';
+const client = new AgoraAgentClient({
+    coordinatorUrl: 'http://localhost:8000',
+    agentId: 'node-agent-1',
+    capabilities: ['testing'],
+});
+await client.register();
+await client.connect();
+await client.run();
+```

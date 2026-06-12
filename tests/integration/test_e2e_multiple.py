@@ -2,7 +2,6 @@
 
 5 agents connect simultaneously, speak, and vote.
 """
-
 from __future__ import annotations
 
 import asyncio
@@ -16,10 +15,13 @@ import websockets
 pytestmark = pytest.mark.integration
 
 
+def _ws_url(port: int, agent_id: str, token: str) -> str:
+    """Build WS URL with token for auth."""
+    return f"ws://127.0.0.1:{port}/ws/{agent_id}?token={token}"
+
+
 @pytest_asyncio.fixture
-async def motion_id_5(
-    coordinator_port: int,
-) -> str:
+async def motion_id_5(coordinator_port: int) -> str:
     """Create and start a motion for 5-agent test."""
     async with httpx.AsyncClient() as c:
         r = await c.post(
@@ -47,25 +49,25 @@ async def test_concurrent_agents_speak(
     motion_id_5: str,
 ) -> None:
     """5 agents connect and speak concurrently."""
-    # Connect all 5 agents
     conns = []
     for i in range(5):
-        url = f"ws://127.0.0.1:{coordinator_port}/ws/test-agent-{i}"
+        url = _ws_url(
+            coordinator_port, f"test-agent-{i}",
+            registered_agents[i]["agent_token"],
+        )
         ws = await websockets.connect(url)
         conns.append(ws)
-        # Receive welcome
         msg = json.loads(await ws.recv())
         assert msg["type"] == "WELCOME"
 
     # All agents speak concurrently
+    stances = ["support", "oppose", "neutral", "support", "oppose"]
     speak_tasks = []
     for i, ws in enumerate(conns):
-        stances = ["support", "oppose", "neutral", "support", "oppose"]
         speak_tasks.append(ws.send(json.dumps({
             "type": "SPEAK",
             "payload": {
-                "motion_id": motion_id_5,
-                "round": 1,
+                "motion_id": motion_id_5, "round": 1,
                 "stance": stances[i],
                 "content": f"Agent {i} opinion on tech stack",
             },
@@ -76,9 +78,7 @@ async def test_concurrent_agents_speak(
     for ws in conns:
         for _ in range(8):
             try:
-                await asyncio.wait_for(
-                    ws.recv(), timeout=2.0
-                )
+                await asyncio.wait_for(ws.recv(), timeout=2.0)
             except asyncio.TimeoutError:
                 break
 
@@ -91,14 +91,13 @@ async def test_concurrent_agents_speak(
         assert r.status_code == 200, r.text
 
     # All 5 agents vote concurrently
-    vote_tasks = []
     votes = ["yes", "no", "yes", "yes", "no"]
+    vote_tasks = []
     for i, ws in enumerate(conns):
         vote_tasks.append(ws.send(json.dumps({
             "type": "VOTE",
             "payload": {
-                "motion_id": motion_id_5,
-                "type": "binary",
+                "motion_id": motion_id_5, "type": "binary",
                 "vote": votes[i],
                 "confidence": 0.7 + i * 0.05,
             },
@@ -109,9 +108,7 @@ async def test_concurrent_agents_speak(
     for ws in conns:
         for _ in range(4):
             try:
-                await asyncio.wait_for(
-                    ws.recv(), timeout=3.0
-                )
+                await asyncio.wait_for(ws.recv(), timeout=3.0)
             except asyncio.TimeoutError:
                 break
 

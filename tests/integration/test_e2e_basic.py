@@ -3,7 +3,6 @@
 Tests the complete flow:
 create_motion -> start -> speak (2 agents) -> vote -> get_result
 """
-
 from __future__ import annotations
 
 import asyncio
@@ -17,10 +16,13 @@ import websockets
 pytestmark = pytest.mark.integration
 
 
+def _ws_url(port: int, agent_id: str, token: str) -> str:
+    """Build WS URL with token for auth."""
+    return f"ws://127.0.0.1:{port}/ws/{agent_id}?token={token}"
+
+
 @pytest_asyncio.fixture
-async def motion_id(
-    coordinator_port: int,
-) -> str:
+async def motion_id(coordinator_port: int) -> str:
     """Create a motion via HTTP and start it; return motion_id."""
     async with httpx.AsyncClient() as c:
         r = await c.post(
@@ -48,8 +50,14 @@ async def test_basic_discussion_flow(
     motion_id: str,
 ) -> None:
     """Full flow: create_motion -> speak (2) -> vote -> result."""
-    url_a = f"ws://127.0.0.1:{coordinator_port}/ws/test-agent-0"
-    url_b = f"ws://127.0.0.1:{coordinator_port}/ws/test-agent-1"
+    url_a = _ws_url(
+        coordinator_port, "test-agent-0",
+        registered_agents[0]["agent_token"],
+    )
+    url_b = _ws_url(
+        coordinator_port, "test-agent-1",
+        registered_agents[1]["agent_token"],
+    )
 
     async with websockets.connect(url_a) as ws_a, \
                websockets.connect(url_b) as ws_b:
@@ -63,8 +71,7 @@ async def test_basic_discussion_flow(
         await ws_a.send(json.dumps({
             "type": "SPEAK",
             "payload": {
-                "motion_id": motion_id,
-                "round": 1,
+                "motion_id": motion_id, "round": 1,
                 "stance": "support",
                 "content": "Microservices provide better isolation.",
             },
@@ -73,8 +80,7 @@ async def test_basic_discussion_flow(
         await ws_b.send(json.dumps({
             "type": "SPEAK",
             "payload": {
-                "motion_id": motion_id,
-                "round": 1,
+                "motion_id": motion_id, "round": 1,
                 "stance": "oppose",
                 "content": "Monolith is simpler for our team.",
             },
@@ -83,9 +89,7 @@ async def test_basic_discussion_flow(
         # Drain broadcast/delivery messages
         for _ in range(4):
             try:
-                await asyncio.wait_for(
-                    ws_a.recv(), timeout=2.0
-                )
+                await asyncio.wait_for(ws_a.recv(), timeout=2.0)
             except asyncio.TimeoutError:
                 break
 
@@ -98,31 +102,19 @@ async def test_basic_discussion_flow(
             assert r.status_code == 200, r.text
 
         # Both agents vote
-        await ws_a.send(json.dumps({
-            "type": "VOTE",
-            "payload": {
-                "motion_id": motion_id,
-                "type": "binary",
-                "vote": "yes",
-                "confidence": 0.8,
-            },
-        }))
-        await ws_b.send(json.dumps({
-            "type": "VOTE",
-            "payload": {
-                "motion_id": motion_id,
-                "type": "binary",
-                "vote": "no",
-                "confidence": 0.7,
-            },
-        }))
+        for ws, vote in [(ws_a, "yes"), (ws_b, "no")]:
+            await ws.send(json.dumps({
+                "type": "VOTE",
+                "payload": {
+                    "motion_id": motion_id, "type": "binary",
+                    "vote": vote, "confidence": 0.8,
+                },
+            }))
 
         # Drain confirmations + result broadcast
         for _ in range(6):
             try:
-                await asyncio.wait_for(
-                    ws_a.recv(), timeout=3.0
-                )
+                await asyncio.wait_for(ws_a.recv(), timeout=3.0)
             except asyncio.TimeoutError:
                 break
 

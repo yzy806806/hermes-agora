@@ -6,4 +6,4 @@ and voting among multiple AI agents.
 
 from __future__ import annotations
 
-__version__ = "0.10.0"
+__version__ = "0.12.0"

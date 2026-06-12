@@ -1,6 +1,6 @@
 """SQL schema definitions for the Agora Coordinator database."""
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 SCHEMA_SQL = """\
 PRAGMA foreign_keys = ON;
@@ -299,6 +299,52 @@ CREATE INDEX IF NOT EXISTS idx_tokens_hash ON tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(tenant_id, actor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_log(tenant_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_event ON audit_log(event_type);
+
+-- Phase 12.5: Session persistence for agent self-evolution
+CREATE TABLE IF NOT EXISTS session_records (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    project_id TEXT NOT NULL DEFAULT 'default',
+    session_type TEXT NOT NULL DEFAULT 'task_execution',
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    input_messages TEXT DEFAULT '[]',
+    output_messages TEXT DEFAULT '[]',
+    tool_calls TEXT DEFAULT '[]',
+    errors TEXT DEFAULT '[]',
+    outcome TEXT DEFAULT 'success',
+    metadata TEXT DEFAULT '{}',
+    notes TEXT DEFAULT '[]',
+    FOREIGN KEY (agent_id) REFERENCES agents(agent_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_agent ON session_records(agent_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_project ON session_records(project_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_outcome ON session_records(outcome);
+
+CREATE TABLE IF NOT EXISTS session_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (session_id) REFERENCES session_records(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_notes_session ON session_notes(session_id);
+
+CREATE TABLE IF NOT EXISTS project_artifacts (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value BLOB,
+    content_type TEXT DEFAULT 'application/octet-stream',
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(project_id, key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_artifacts_project ON project_artifacts(project_id);
 """
 MIGRATION_6_TO_7 = [
     "ALTER TABLE agents ADD COLUMN agent_type TEXT DEFAULT 'hermes';",
@@ -394,7 +440,50 @@ MIGRATION_8_TO_9 = [
 
 # Phase 11.1b: Agent config column (schema version 9 → 10)
 MIGRATION_9_TO_10 = [
-    "ALTER TABLE agents ADD COLUMN allowed_discussion_roles TEXT DEFAULT '[\"participant\"]';",
+    """ALTER TABLE agents ADD COLUMN allowed_discussion_roles TEXT DEFAULT '["participant"]';""",
+]
+
+# Phase 12.5a: Session + artifact tables (schema version 10 → 11)
+MIGRATION_10_TO_11 = [
+    """CREATE TABLE IF NOT EXISTS session_records (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    project_id TEXT NOT NULL DEFAULT 'default',
+    session_type TEXT NOT NULL DEFAULT 'task_execution',
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    input_messages TEXT DEFAULT '[]',
+    output_messages TEXT DEFAULT '[]',
+    tool_calls TEXT DEFAULT '[]',
+    errors TEXT DEFAULT '[]',
+    outcome TEXT DEFAULT 'success',
+    metadata TEXT DEFAULT '{}',
+    notes TEXT DEFAULT '[]',
+    FOREIGN KEY (agent_id) REFERENCES agents(agent_id)
+);""",
+    "CREATE INDEX IF NOT EXISTS idx_sessions_agent ON session_records(agent_id);",
+    "CREATE INDEX IF NOT EXISTS idx_sessions_project ON session_records(project_id);",
+    "CREATE INDEX IF NOT EXISTS idx_sessions_outcome ON session_records(outcome);",
+    """CREATE TABLE IF NOT EXISTS session_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (session_id) REFERENCES session_records(id) ON DELETE CASCADE
+);""",
+    "CREATE INDEX IF NOT EXISTS idx_session_notes_session ON session_notes(session_id);",
+    """CREATE TABLE IF NOT EXISTS project_artifacts (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value BLOB,
+    content_type TEXT DEFAULT 'application/octet-stream',
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(project_id, key)
+);""",
+    "CREATE INDEX IF NOT EXISTS idx_artifacts_project ON project_artifacts(project_id);",
 ]
 
 # Default RBAC roles to seed on fresh DB

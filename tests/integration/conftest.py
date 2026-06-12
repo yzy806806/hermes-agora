@@ -3,7 +3,6 @@
 Starts a real Coordinator subprocess with a temp DB,
 registers test agents via HTTP, and provides helper functions.
 """
-
 from __future__ import annotations
 
 import asyncio
@@ -52,7 +51,6 @@ async def _wait_for_health(
 async def coordinator_port() -> AsyncGenerator[int, None]:
     """Start a real Coordinator subprocess; yield its port."""
     port = _find_free_port()
-    # Use a temp file since :memory: loses data across connections
     tmp_dir = tempfile.mkdtemp(prefix="agora_e2e_")
     db_path = os.path.join(tmp_dir, "agora.db")
     env = {
@@ -61,6 +59,8 @@ async def coordinator_port() -> AsyncGenerator[int, None]:
         "AGORA_HOST": "127.0.0.1",
         "AGORA_PORT": str(port),
         "AGORA_LOG_LEVEL": "warning",
+        # Ensure auto-approval so agents can connect immediately
+        "AGORA_REQUIRE_APPROVAL": "false",
     }
     proc = await asyncio.create_subprocess_exec(
         "uv", "run", "python", "-m", "agora.coordinator.main",
@@ -88,7 +88,7 @@ async def coordinator_port() -> AsyncGenerator[int, None]:
 async def registered_agents(
     coordinator_port: int,
 ) -> list[dict]:
-    """Register 5 test agents via HTTP; return their info dicts."""
+    """Register 5 test agents via HTTP; return their info with tokens."""
     agents = []
     for i in range(5):
         aid = f"test-agent-{i}"
