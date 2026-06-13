@@ -1,7 +1,8 @@
-"""Dashboard API routes: events, SSE stream, discussion timeline, audit query.
+"""Dashboard API routes: events, discussion timeline, audit query.
 
-Serves the event history, real-time event stream via SSE,
-discussion timeline for the dashboard frontend, and audit log query.
+Real-time updates are pushed via the /ws/dashboard WebSocket endpoint
+(Phase 13.2b). The SSE /events/stream endpoint is deprecated and will
+be removed in a future release.
 """
 from __future__ import annotations
 
@@ -74,9 +75,15 @@ async def get_events(
     ]
 
 
-@router.get("/events/stream")
+@router.get("/events/stream", deprecated=True, include_in_schema=False)
 async def events_stream(request: Request) -> StreamingResponse:
-    """SSE endpoint: push new events to connected clients."""
+    """SSE endpoint: push new events to connected clients.
+
+    .. deprecated:: Phase 13.2b
+       Use /ws/dashboard WebSocket instead. This SSE endpoint is
+       removed from the OpenAPI schema (include_in_schema=False) and
+       will be fully deleted in a future release.
+    """
     storage = _get_storage()
 
     async def generate():

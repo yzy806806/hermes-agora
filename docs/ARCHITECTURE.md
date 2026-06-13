@@ -1,6 +1,6 @@
 # Agora 架构文档
 
-> 版本: v0.12.0 | 最后更新: 2026-06-11
+> 版本: v0.13.0 | 最后更新: 2026-06-12
 
 ## 整体架构
 
@@ -44,7 +44,11 @@
                     │  └───────────┘ └───────────────┘  │
                     │  ┌───────────┐ ┌───────────────┐  │
                     │  │ API Rate  │ │ Dashboard     │  │
-                    │  │ Limiter   │ │ (static)      │  │
+                    │  │ Limiter   │ │ (static+WS)   │  │
+                    │  └───────────┘ └───────────────┘  │
+                    │  ┌───────────┐ ┌───────────────┐  │
+                    │  │ Pipeline  │ │ Notification   │  │
+                    │  │ Orchestr. │ │ Manager        │  │
                     │  └───────────┘ └───────────────┘  │
                     │  ┌───────────────────────────┐    │
                     │  │ Storage (SQLite)          │    │
@@ -196,11 +200,27 @@ agora/
 │   │   │   ├── bootstrap_approval.py # 审批存储
 │   │   │   ├── events.py    # 事件存储 (Phase 8)
 │   │   │   ├── global_store.py # 全局数据库 (Phase 8)
-│   │   │   └── storage_manager.py # 多租户管理 (Phase 8)
+│   │   │   ├── storage_manager.py # 多租户管理 (Phase 8)
+│   │   │   ├── pipelines.py # Pipeline CRUD (Phase 13)
+│   │   │   └── notifications.py # Notification CRUD (Phase 13)
 │   │   ├── dashboard.py     # Dashboard API (Phase 8)
-│   │   └── static/          # Dashboard 前端 (Phase 8)
+│   │   ├── dashboard_ws.py  # Dashboard WS fan-out (Phase 13)
+│   │   ├── pipeline.py      # PipelineOrchestrator (Phase 13)
+│   │   ├── pipeline_models.py # PipelineRun, PipelinePhase (Phase 13)
+│   │   ├── pipeline_review_models.py # ReviewRequest/Result (Phase 13)
+│   │   ├── pipeline_router.py # Pipeline REST API (Phase 13)
+│   │   ├── pipeline_review.py # Code review phase (Phase 13)
+│   │   ├── notifications.py # NotificationManager (Phase 13)
+│   │   ├── notification_models.py # Notification model (Phase 13)
+│   │   ├── notification_router.py # Notification REST API (Phase 13)
+│   │   ├── health.py        # Health check endpoint (Phase 13)
+│   │   └── static/          # Dashboard 前端 (Phase 8+13)
 │   │       ├── dashboard.html
-│   │       └── dashboard.js
+│   │       ├── dashboard.js
+│   │       └── js/
+│   │           ├── charts.js        # Chart.js viz (Phase 13)
+│   │           ├── notifications.js # Notification UI (Phase 13)
+│   │           └── ws_client.js     # WS client replaces SSE (Phase 13)
 │   └── agent_client/        # Agent 客户端库
 │       ├── __init__.py      # 导出 AgoraClient/AgoraConfig
 │       ├── client.py        # HTTP + WS 客户端（含 RateLimitTracker）
@@ -230,6 +250,7 @@ agora/
 || 10.2 | RBAC 权限控制 | rbac, token_manager, audit, Role, Permission, @requires | 角色权限 + JWT Token + 审计日志 ||
 || 10.3 | 插件生态 | plugin, plugin_manager, plugin_discovery, plugin_sandbox, plugin_extensions | Hook 系统 + 入口点发现 + 沙箱隔离 ||
 || 12 | 多平台 Agent 集成 | packages/agora-agent-sdk, packages/hermes-bridge, packages/cli-bridge, packages/agora-agent-sdk-js | Agent SDK + Hermes/CLI Bridge + Node.js SDK + Session 持久化 ||
+|| 13 | 全自动开发循环 + Dashboard 增强 | pipeline*, notifications*, dashboard_ws, health, charts.js, ws_client.js, docker-compose.prod.yaml | Pipeline Orchestrator + WS Push + Charts + Notifications + Go/Rust SDK + 生产部署 ||
 
 ## 模块关系图
 
@@ -323,7 +344,7 @@ draft ──(start)──→ discussing ──(start_voting)──→ voting ─
 6. **客户端自动重连**：ws_pool.py 实现指数退避重连 + 请求-响应匹配
 7. **可观测性三支柱**：Metrics (Prometheus) + Events (结构化日志) + Traces (请求追踪)
 8. **多租户隔离**：per-tenant SQLite 实例，StorageManager 懒创建，默认租户保证向后兼容
-9. **轻量 Dashboard**：纯 HTML+JS 前端，通过 REST API + SSE 获取数据，Chart.js 渲染
+9. **轻量 Dashboard**：纯 HTML+JS 前端，通过 REST API + SSE 获取数据，Chart.js 渲染 → Phase 13 升级为 WebSocket Push
 10. **任务执行引擎**：讨论关闭后自动生成 TaskGraph (DAG)，按能力匹配分配 agent，通过 WS 消息驱动任务生命周期
 11. **Agent 认证协议**：Token 认证（POST /register 获取 agent_token → WS 连接携带 token 验证），支持审批流（pending/approved）
 12. **Token Bucket 限速**：per-agent TPM 令牌桶，支持 burst（默认 1.5x），coordinator 跟踪 + client 本地预检双重保障
@@ -335,6 +356,13 @@ draft ──(start)──→ discussing ──(start_voting)──→ voting ─
 18. **CLI Bridge PTY 模式**：不修改 CLI agent 本身，PTY 子进程 + ToolAdapter 统一不同工具调用格式
 19. **Session 持久化在 Agora**：agent 通过 API 查询自身历史，不替代 agent 自身的 memory 机制
 20. **制品存储为简单 KV**：足够存 conventions/notes/findings，大型制品留在 git/project 中
+21. **Pipeline Orchestrator 为指挥者而非新引擎**：复用所有现有组件（讨论、Task DAG、并行执行、Bridge），仅添加编排层串联端到端流程
+22. **Code Review 作为 Pipeline 阶段**：而非 Task 类型 — 在所有任务完成后审查整体 PR，不是逐个 commit
+23. **Dashboard WS 替代 SSE**：SSE 是 Phase 8 临时方案，WebSocket 双向且已用于 agent 通信，统一 WS 减少代码路径
+24. **Go/Rust SDK 为薄封装**：实现与 Python/Node.js SDK 相同协议，无需新服务端功能；Docker Bridge 已支持无 SDK 接入
+25. **Docker Compose 用于生产部署**：单实例 + 健康检查 + 资源限制，~50 agents 足够；K8s 此阶段过度
+26. **Notification 存储在 SQLite**：同库同备份策略，此规模无需独立消息队列
+27. **Feedback Loop 复用 Session 持久化**：Pipeline 完成后 session record + artifacts 使下次迭代可学习，无需独立学习引擎
 
 ## Phase 9.1: 平台独立化
 
@@ -634,3 +662,46 @@ cli-bridge/
 - **SessionRecord**: agent 会话完整记录（输入/输出/工具调用/错误/结果）
 - **ProjectArtifact**: 项目级 KV 存储（conventions/notes/findings）
 - Agent 通过 REST API 查询历史，Agora 不替代 agent 自身 memory
+
+## Phase 13: 全自动开发循环 + Dashboard 增强
+
+详细架构见拆分文档：
+
+- [ARCHITECTURE-phase13-pipeline.md](ARCHITECTURE-phase13-pipeline.md) — Pipeline Orchestrator
+- [ARCHITECTURE-phase13-dashboard.md](ARCHITECTURE-phase13-dashboard.md) — WS Push + Charts + Notifications
+- [ARCHITECTURE-phase13-sdks.md](ARCHITECTURE-phase13-sdks.md) — Go/Rust SDK
+- [ARCHITECTURE-phase13-deploy.md](ARCHITECTURE-phase13-deploy.md) — 多租户生产部署
+
+### 核心流程
+
+```
+User Idea → DISCUSSING → DECOMPOSING → EXECUTING → REVIEWING → RELEASING → COMPLETED
+                 ↓            ↓           ↓          ↓           ↓
+               FAILED       FAILED      FAILED     FAILED      FAILED
+```
+
+### 新增组件
+
+| 组件 | 文件 | 说明 |
+|------|------|------|
+| PipelineOrchestrator | pipeline.py | 端到端编排，复用所有现有组件 |
+| PipelineRun/Phase | pipeline_models.py | Pipeline 数据模型 + 状态机 |
+| ReviewRequest/Result | pipeline_review_models.py | Code Review 数据模型 |
+| Pipeline REST API | pipeline_router.py | CRUD + cancel/retry |
+| Code Review Phase | pipeline_review.py | 收集变更文件 → 分配 reviewer |
+| NotificationManager | notifications.py | 创建通知 + 推送到 Dashboard WS |
+| Notification Model | notification_models.py | Notification 数据模型 |
+| Notification REST API | notification_router.py | list/mark read/mark all |
+| Dashboard WS Fan-out | dashboard_ws.py | 事件广播到所有订阅客户端 |
+| Health Check | health.py | /api/v1/health 端点 |
+| Charts | static/js/charts.js | Chart.js 可视化 (5 种图表) |
+| WS Client | static/js/ws_client.js | 替代 SSE 的 WebSocket 客户端 |
+| Notification UI | static/js/notifications.js | 铃铛图标 + 下拉面板 |
+
+### Go/Rust SDK
+
+位于 `packages/` 下独立包，实现与 Python/Node.js SDK 相同的 HTTP/WS 协议。详见 [ARCHITECTURE-phase13-sdks.md](ARCHITECTURE-phase13-sdks.md)。
+
+### 生产部署
+
+`docker-compose.prod.yaml` 提供单实例部署模板：coordinator + 可选 hermes-bridge，含健康检查、资源限制、RBAC 强制。详见 [ARCHITECTURE-phase13-deploy.md](ARCHITECTURE-phase13-deploy.md)。

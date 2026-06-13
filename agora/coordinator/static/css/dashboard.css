@@ -10,10 +10,11 @@
 body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
 
 /* Navigation */
-nav { background: var(--bg-card); padding: 12px 24px; display: flex; gap: 8px; flex-wrap: wrap; }
+nav { background: var(--bg-card); padding: 12px 24px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 nav a { color: var(--text-dim); text-decoration: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; }
 nav a:hover { background: var(--bg-input); }
 nav a.active { background: var(--accent); color: #fff; }
+nav .notif-bell { margin-left: auto; }
 
 /* Pages */
 .page { display: none; padding: 24px; max-width: 1400px; margin: 0 auto; }
@@ -50,4 +51,35 @@ button.danger { background: var(--danger); }
 button.danger:hover { background: #dc2626; }
 button.secondary { background: var(--bg-input); color: var(--text); }
 button.btn-sm { padding: 4px 10px; font-size: 12px; margin-right: 4px; }
+
+/* Connection status indicator (Phase 13.2c) */
+.conn-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-dim); margin-left: 12px;
+}
+.conn-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block; flex-shrink: 0;
+}
+.conn-dot.connected { background: var(--success); }
+.conn-dot.reconnecting { background: var(--warning); animation: pulse 1.5s infinite; }
+.conn-dot.offline { background: var(--danger); }
+@keyframes pulse {
+  0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
+}
+.conn-status.reconnecting .conn-label { color: var(--warning); }
+.conn-status.offline .conn-label { color: var(--danger); }
+
+/* Charts grid (Phase 13.3b) */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.chart-card { padding: 12px; }
+.chart-card-wide { grid-column: 1 / -1; }
+@media (max-width: 768px) {
+  .charts-grid { grid-template-columns: 1fr; }
+  .chart-card-wide { grid-column: 1; }
+}
 

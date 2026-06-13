@@ -1,6 +1,6 @@
 """SQL schema definitions for the Agora Coordinator database."""
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 14
 
 SCHEMA_SQL = """\
 PRAGMA foreign_keys = ON;
@@ -345,6 +345,46 @@ CREATE TABLE IF NOT EXISTS project_artifacts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_artifacts_project ON project_artifacts(project_id);
+
+-- Phase 13: Pipeline runs for full-auto dev loop
+
+CREATE TABLE IF NOT EXISTS pipeline_runs (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    idea TEXT NOT NULL,
+    motion_id TEXT,
+    graph_id TEXT,
+    phase TEXT NOT NULL DEFAULT 'discussing',
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    tasks_total INTEGER NOT NULL DEFAULT 0,
+    tasks_completed INTEGER NOT NULL DEFAULT 0,
+    tasks_failed INTEGER NOT NULL DEFAULT 0,
+    review_outcome TEXT,
+    release_version TEXT,
+    error TEXT,
+    failed_phase TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_project ON pipeline_runs(project_id);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_phase ON pipeline_runs(phase);
+
+-- Phase 13: Notifications for dashboard enhancement
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    priority TEXT NOT NULL DEFAULT 'medium',
+    created_at TEXT NOT NULL,
+    read INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_project ON notifications(project_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
 """
 MIGRATION_6_TO_7 = [
     "ALTER TABLE agents ADD COLUMN agent_type TEXT DEFAULT 'hermes';",
@@ -484,6 +524,51 @@ MIGRATION_10_TO_11 = [
     UNIQUE(project_id, key)
 );""",
     "CREATE INDEX IF NOT EXISTS idx_artifacts_project ON project_artifacts(project_id);",
+]
+
+# Phase 13: Pipeline runs table (schema version 11 -> 12)
+MIGRATION_11_TO_12 = [
+    """CREATE TABLE IF NOT EXISTS pipeline_runs (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    idea TEXT NOT NULL,
+    motion_id TEXT,
+    graph_id TEXT,
+    phase TEXT NOT NULL DEFAULT 'discussing',
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    tasks_total INTEGER NOT NULL DEFAULT 0,
+    tasks_completed INTEGER NOT NULL DEFAULT 0,
+    tasks_failed INTEGER NOT NULL DEFAULT 0,
+    review_outcome TEXT,
+    release_version TEXT,
+    error TEXT,
+    failed_phase TEXT
+);""",
+    "CREATE INDEX IF NOT EXISTS idx_pipeline_runs_project ON pipeline_runs(project_id);",
+    "CREATE INDEX IF NOT EXISTS idx_pipeline_runs_phase ON pipeline_runs(phase);",
+]
+
+# Phase 13b: Add failed_phase column to existing pipeline_runs (12 → 13)
+MIGRATION_12_TO_13_PIPELINES = [
+    "ALTER TABLE pipeline_runs ADD COLUMN failed_phase TEXT;",
+]
+
+# Phase 13: Notifications table (schema version 12 → 13)
+MIGRATION_12_TO_13 = [
+    """CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    priority TEXT NOT NULL DEFAULT 'medium',
+    created_at TEXT NOT NULL,
+    read INTEGER NOT NULL DEFAULT 0
+);""",
+    "CREATE INDEX IF NOT EXISTS idx_notifications_project ON notifications(project_id);",
+    "CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);",
+    "CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);",
 ]
 
 # Default RBAC roles to seed on fresh DB

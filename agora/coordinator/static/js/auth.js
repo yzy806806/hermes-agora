@@ -14,6 +14,7 @@ function checkAuth() {
   } catch { api.clearToken(); showLogin(); return; }
   hideLogin();
   applyRoleVisibility();
+  ws.connect(token);  // Phase 13.2b: always reconnect WS on auth check
 }
 
 function showLogin() {

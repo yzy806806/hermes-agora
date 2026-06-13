@@ -3,6 +3,7 @@
 PING, REGISTER, and SPEAK handlers. VOTE handler lives in ws_vote.py.
 Smart discussion assessment lives in ws_smart.py.
 Phase 9.3: Updated handle_register with new fields + AgentConfig.
+Phase 13.1f: Added PIPELINE_* message handlers for dashboard push.
 """
 
 from __future__ import annotations
@@ -178,3 +179,67 @@ async def _send_error(
         "type": MessageType.ERROR,
         "payload": {"code": code, "message": message},
     })
+
+
+# ---------------------------------------------------------------------------
+# Phase 13.1f: Pipeline WS message handlers
+# ---------------------------------------------------------------------------
+
+async def handle_pipeline_phase_change(
+    pipeline_id: str, phase: str, project_id: str,
+    prev_phase: str | None = None,
+) -> int:
+    """Broadcast PIPELINE_PHASE_CHANGE to dashboard clients."""
+    from .event_bus import publish
+    return await publish("PIPELINE_PHASE_CHANGE", {
+        "pipeline_id": pipeline_id,
+        "phase": phase,
+        "previous_phase": prev_phase,
+        "project_id": project_id,
+    }, channel="pipelines")
+
+
+async def handle_pipeline_task_update(
+    pipeline_id: str, task_id: str, status: str,
+    project_id: str, agent_id: str | None = None,
+) -> int:
+    """Broadcast PIPELINE_TASK_UPDATE to dashboard clients."""
+    from .event_bus import publish
+    return await publish("PIPELINE_TASK_UPDATE", {
+        "pipeline_id": pipeline_id,
+        "task_id": task_id,
+        "status": status,
+        "agent_id": agent_id,
+        "project_id": project_id,
+    }, channel="pipelines")
+
+
+async def handle_pipeline_completed(
+    pipeline_id: str, project_id: str,
+    tasks_total: int = 0, tasks_completed: int = 0,
+    tasks_failed: int = 0, release_version: str | None = None,
+) -> int:
+    """Broadcast PIPELINE_COMPLETED to dashboard clients."""
+    from .event_bus import publish
+    return await publish("PIPELINE_COMPLETED", {
+        "pipeline_id": pipeline_id,
+        "project_id": project_id,
+        "tasks_total": tasks_total,
+        "tasks_completed": tasks_completed,
+        "tasks_failed": tasks_failed,
+        "release_version": release_version,
+    }, channel="pipelines")
+
+
+async def handle_pipeline_error(
+    pipeline_id: str, project_id: str,
+    error: str, phase: str | None = None,
+) -> int:
+    """Broadcast PIPELINE_ERROR to dashboard clients."""
+    from .event_bus import publish
+    return await publish("PIPELINE_ERROR", {
+        "pipeline_id": pipeline_id,
+        "project_id": project_id,
+        "error": error,
+        "phase": phase,
+    }, channel="pipelines")

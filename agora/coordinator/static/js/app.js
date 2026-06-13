@@ -1,5 +1,7 @@
 /* App entry point — SPA router + nav handling (auth in auth.js) */
 import { auth } from './auth.js';
+import { ws } from './ws-client.js';
+import { notifUI } from './notifications-ui.js';
 
 let currentPage = null;
 const pages = {};
@@ -45,7 +47,21 @@ function init() {
     auth.logout();
   });
   auth.checkAuth();
+  notifUI.init();
+  wireConnStatus();
   navigate(location.hash.slice(1) || 'overview');
+}
+
+const STATUS_LABELS = { connected:'Connected', reconnecting:'Reconnecting…', offline:'Offline' };
+function wireConnStatus() {
+  ws.onStatus(s => {
+    const dot = document.getElementById('conn-dot');
+    const lbl = document.getElementById('conn-label');
+    const wrap = document.getElementById('conn-status');
+    if (dot) dot.className = `conn-dot ${s}`;
+    if (lbl) lbl.textContent = STATUS_LABELS[s] || s;
+    if (wrap) wrap.className = `conn-status ${s}`;
+  });
 }
 
 export const app = { init, navigate, getUserRole: auth.getUserRole };

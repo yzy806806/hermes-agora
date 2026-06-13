@@ -1,10 +1,10 @@
-"""Dashboard WebSocket endpoint with JWT authentication.
+"""Dashboard WebSocket hub — event fan-out with subscription filtering.
 
-Phase 11.2b: Real-time event feed for the web dashboard.
-Separate from agent WS (/ws/{agent_id}) because:
-- Dashboard is a human viewer, not an agent
-- Different message types (read-only observation)
-- Different auth (JWT login vs agent token)
+Phase 13.2a: Upgraded from Phase 11.2b.
+- Clients subscribe to channels (events, notifications, pipelines)
+- Clients subscribe to project_ids for per-project filtering
+- broadcast_event filters by channel AND project_id
+- Tracks connected clients; auto-cleans stale connections
 """
 from __future__ import annotations
 
@@ -15,18 +15,14 @@ from typing import Any
 from fastapi import WebSocket
 
 from .models import MessageType
-from .token_manager import TokenManager
 
 logger = logging.getLogger(__name__)
 
-# Event types pushed to dashboard
-DASHBOARD_EVENTS = [
-    "DISCUSSION_UPDATE",
-    "TASK_UPDATE",
-    "AGENT_STATUS",
-    "PLUGIN_EVENT",
-    "AUDIT_EVENT",
-]
+# Channels available for subscription
+CHANNEL_EVENTS = "events"
+CHANNEL_NOTIFICATIONS = "notifications"
+CHANNEL_PIPELINES = "pipelines"
+ALL_CHANNELS = {CHANNEL_EVENTS, CHANNEL_NOTIFICATIONS, CHANNEL_PIPELINES}
 
 
 class DashboardClient:
@@ -37,6 +33,7 @@ class DashboardClient:
         self.role = role
         self.tenant_id = tenant_id
         self.subscriptions: set[str] = set()
+        self.project_subscriptions: set[str] = set()
 
     async def send(self, message: dict[str, Any]) -> bool:
         try:
@@ -47,22 +44,22 @@ class DashboardClient:
 
 
 class DashboardHub:
-    """Manages connected dashboard clients."""
+    """Manages connected dashboard clients with fan-out."""
 
     def __init__(self) -> None:
         self._clients: dict[str, DashboardClient] = {}
-        self._token_mgr: TokenManager | None = None
+        self._token_mgr: Any = None
 
-    def set_token_manager(self, token_mgr: TokenManager) -> None:
+    def set_token_manager(self, token_mgr: Any) -> None:
         self._token_mgr = token_mgr
+
+    @property
+    def connected_clients(self) -> int:
+        return len(self._clients)
 
     async def connect(
         self, client_id: str, websocket: WebSocket, token: str,
     ) -> tuple[bool, str, str | None]:
-        """Validate JWT and accept connection.
-
-        Returns (success, role, tenant_id).
-        """
         if self._token_mgr is None:
             await websocket.close(code=1011, reason="Server not initialized")
             return False, "", None
@@ -84,7 +81,6 @@ class DashboardHub:
         logger.info("Dashboard client %s disconnected", client_id)
 
     async def handle_message(self, client_id: str, raw: str) -> None:
-        """Route message from dashboard client."""
         client = self._clients.get(client_id)
         if client is None:
             return
@@ -99,36 +95,58 @@ class DashboardHub:
         msg_type = msg.get("type", "")
         payload = msg.get("payload", {})
         if msg_type == "SUBSCRIBE":
-            channels = payload.get("channels", [])
-            client.subscriptions.update(channels)
-            await client.send({
-                "type": "SUBSCRIBED",
-                "payload": {"channels": list(client.subscriptions)},
-            })
+            self._handle_subscribe(client, payload)
         elif msg_type == "UNSUBSCRIBE":
-            channels = payload.get("channels", [])
-            client.subscriptions.difference_update(channels)
-            await client.send({
-                "type": "UNSUBSCRIBED",
-                "payload": {"channels": list(client.subscriptions)},
-            })
+            self._handle_unsubscribe(client, payload)
+        elif msg_type == "SUBSCRIBE_PROJECT":
+            self._handle_project_subscribe(client, payload)
+        elif msg_type == "UNSUBSCRIBE_PROJECT":
+            self._handle_project_unsubscribe(client, payload)
         else:
             logger.warning("Unknown dashboard message type: %s", msg_type)
 
+    def _handle_subscribe(self, client: DashboardClient, payload: dict) -> None:
+        channels = set(payload.get("channels", [])) & ALL_CHANNELS
+        client.subscriptions.update(channels)
+
+    def _handle_unsubscribe(self, client: DashboardClient, payload: dict) -> None:
+        channels = set(payload.get("channels", []))
+        client.subscriptions.difference_update(channels)
+
+    def _handle_project_subscribe(
+        self, client: DashboardClient, payload: dict,
+    ) -> None:
+        pids = set(payload.get("project_ids", []))
+        client.project_subscriptions.update(pids)
+
+    def _handle_project_unsubscribe(
+        self, client: DashboardClient, payload: dict,
+    ) -> None:
+        pids = set(payload.get("project_ids", []))
+        client.project_subscriptions.difference_update(pids)
+
     async def broadcast_event(
         self, event_type: str, payload: dict[str, Any],
-        channel: str = "events",
+        channel: str = CHANNEL_EVENTS,
     ) -> int:
-        """Broadcast an event to subscribed dashboard clients."""
+        """Broadcast event to clients subscribed to channel + project."""
+        project_id = payload.get("project_id")
         count = 0
-        for client in self._clients.values():
-            if channel in client.subscriptions:
-                sent = await client.send({
-                    "type": event_type,
-                    "payload": payload,
-                })
-                if sent:
-                    count += 1
+        stale: list[str] = []
+        for cid, client in self._clients.items():
+            if channel not in client.subscriptions:
+                continue
+            if project_id and client.project_subscriptions:
+                if project_id not in client.project_subscriptions:
+                    continue
+            sent = await client.send({"type": event_type, "payload": payload})
+            if sent:
+                count += 1
+            else:
+                stale.append(cid)
+        for cid in stale:
+            self._clients.pop(cid, None)
+            logger.info("Cleaned up stale dashboard client %s", cid)
         return count
 
 

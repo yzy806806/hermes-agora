@@ -65,6 +65,17 @@ from .event_bus import init_event_bus
 # Phase 11.1b: Agent config routes
 from .agent_config_routes import router as agent_config_router
 from .agent_config_routes import init_agent_config_deps
+# Phase 13.3a: Metrics history API
+from .metrics_history_router import router as metrics_history_router
+from .metrics_history_router import init_metrics_history_deps
+# Phase 13.7b: Health check router
+from .health import router as health_router
+# Phase 13.4c: Notification router
+from .notification_router import router as notification_router
+from .notification_router import init_notification_router_deps
+# Phase 13.1e: Pipeline REST API
+from .pipeline_router import router as pipeline_router
+from .pipeline_router import init_pipeline_router_deps
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +149,12 @@ async def lifespan(app: FastAPI):
     init_event_bus(dashboard_hub)
     # Phase 11.1b: Agent config deps
     init_agent_config_deps(storage, token_mgr)
+    # Phase 13.4c: Notification router deps
+    init_notification_router_deps(storage)
+    # Phase 13.1e: Pipeline router deps
+    init_pipeline_router_deps(storage)
+    # Phase 13.3a: Metrics history deps
+    init_metrics_history_deps(storage)
     # Phase 10.1: Parallel execution coordinator
     resource_tracker = FileResourceTracker()
     parallel_coord = ParallelExecutionCoordinator(
@@ -227,6 +244,11 @@ def create_app() -> FastAPI:
     app.include_router(plugin_action_router, prefix="/api/v1")
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(agent_config_router, prefix="/api/v1")
+    app.include_router(notification_router, prefix="/api/v1")
+    app.include_router(pipeline_router, prefix="/api/v1")
+    app.include_router(metrics_history_router, prefix="/api/v1")
+    # Phase 13.7b: Health check (no auth, for Docker healthcheck)
+    app.include_router(health_router, prefix="/api/v1")
     app.add_api_websocket_route("/ws/{agent_id}", websocket_endpoint)
     # Phase 11.2b: Dashboard WebSocket endpoint
     app.add_api_websocket_route("/ws/dashboard", dashboard_ws_endpoint)
@@ -241,10 +263,11 @@ def create_app() -> FastAPI:
         from fastapi.responses import FileResponse
         return FileResponse(static_dir / "dashboard.html")
 
+    # Legacy /health redirect (backward compat with Phase 7 Docker config)
     @app.get("/health")
-    @app.get("/api/v1/health")
-    async def health_check():
-        return {"status": "healthy"}
+    async def health_legacy():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/api/v1/health")
 
     return app
 

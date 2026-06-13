@@ -1,4 +1,6 @@
-/* Agent Management Page — table, approve/reject, suspend, inline config, token rotation */
+/* Agent Management Page — table, approve/reject, suspend, inline config.
+Phase 13.2b: uses AGENT_STATUS canonical type
+(backward-compat via ws-client alias from AGENT_ONLINE/OFFLINE). */
 import { api } from '../api.js';
 import { ws } from '../ws-client.js';
 let unsubs = [];
@@ -25,7 +27,7 @@ async function load() {
   const tb = document.getElementById('agent-tbody'); if (!tb) return;
   try {
     const agents = await api.get('/admin/agents');
-    const q = (document.getElementById('agent-search')?.value || '').toLowerCase();
+    const q = (document.getElementById('agent-search')?.value||'').toLowerCase();
     tb.innerHTML = agents.filter(a => a.name.toLowerCase().includes(q) || a.agent_id.toLowerCase().includes(q))
       .map(a => `<tr data-id="${a.agent_id}">
         <td>${esc(a.name)} <span style="color:#94a3b8;font-size:11px">${a.agent_id.slice(0,8)}</span></td>
@@ -40,11 +42,10 @@ async function load() {
 }
 
 function btns(a) {
-  const id = a.agent_id, s = a.approval_status;
-  let r = '';
-  if (s === 'pending') r += `<button class="btn-sm" data-act="approve" data-id="${id}">Approve</button><button class="danger btn-sm" data-act="reject" data-id="${id}">Reject</button>`;
-  if (s === 'approved') r += `<button class="danger btn-sm" data-act="suspend" data-id="${id}">Suspend</button>`;
-  if (s === 'suspended') r += `<button class="btn-sm" data-act="approve" data-id="${id}">Activate</button>`;
+  const id = a.agent_id, s = a.approval_status; let r = '';
+  if (s==='pending') r += `<button class="btn-sm" data-act="approve" data-id="${id}">Approve</button><button class="danger btn-sm" data-act="reject" data-id="${id}">Reject</button>`;
+  if (s==='approved') r += `<button class="danger btn-sm" data-act="suspend" data-id="${id}">Suspend</button>`;
+  if (s==='suspended') r += `<button class="btn-sm" data-act="approve" data-id="${id}">Activate</button>`;
   r += `<button class="secondary btn-sm" data-act="token" data-id="${id}">Token</button>`;
   r += `<button class="btn-sm" data-act="save" data-id="${id}">Save</button>`;
   return r;
@@ -52,12 +53,11 @@ function btns(a) {
 
 async function act(action, id, row) {
   try {
-    if (action === 'save') {
+    if (action==='save') {
       const body = {};
       row.querySelectorAll('.inline').forEach(i => body[i.dataset.f] = Number(i.value));
-      await api.put(`/admin/agents/${id}/config`, body);
-      load();
-    } else if (action === 'token') {
+      await api.put(`/admin/agents/${id}/config`, body); load();
+    } else if (action==='token') {
       const r = await api.post(`/admin/agents/${id}/token`);
       document.getElementById('token-value').textContent = r.agent_token;
       document.getElementById('token-modal').classList.remove('hidden');
@@ -67,8 +67,7 @@ async function act(action, id, row) {
 
 function subWS() {
   ws.subscribe(['agents']);
+  // Phase 13.2b: AGENT_STATUS canonical type (aliased from AGENT_ONLINE/OFFLINE)
   unsubs.push(ws.on('AGENT_STATUS', load));
-  unsubs.push(ws.on('AGENT_ONLINE', load));
-  unsubs.push(ws.on('AGENT_OFFLINE', load));
 }
 function esc(s) { return String(s).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c])); }

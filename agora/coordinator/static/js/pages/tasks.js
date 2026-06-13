@@ -1,4 +1,6 @@
-/* Task Kanban Page — fetch graphs, render board, WS real-time updates */
+/* Task Kanban Page — fetch graphs, render board, WS real-time updates.
+Phase 13.2b: uses TASK_UPDATE canonical type
+(backward-compat via ws-client alias from TASK_STATUS etc). */
 import { api } from '../api.js';
 import { ws } from '../ws-client.js';
 import { KanbanBoard } from '../components/kanban-board.js';
@@ -19,7 +21,7 @@ export function mount(container) {
   document.getElementById('task-modal').onclick = e => {
     if (e.target.id === 'task-modal') e.target.classList.add('hidden');
   };
-  board = new KanbanBoard(document.getElementById('kanban-container'), { onCardClick: showDetail });
+  board = new KanbanBoard(document.getElementById('kanban-container'), {onCardClick: showDetail});
   loadGraphs(); loadTasks(); subscribeWS();
 }
 
@@ -67,7 +69,8 @@ async function showDetail(taskId) {
 
 function subscribeWS() {
   ws.subscribe(['tasks']);
-  unsubTask = ws.on('TASK_STATUS', p => {
+  // Phase 13.2b: TASK_UPDATE canonical type (aliased from TASK_STATUS etc)
+  unsubTask = ws.on('TASK_UPDATE', p => {
     if (board && p.task_id) board.moveCard(p.task_id, p.status);
   });
 }

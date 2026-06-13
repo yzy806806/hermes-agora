@@ -1,6 +1,6 @@
 # Agora API 参考
 
-> 版本: v0.12.0 | 基础路径: `/api/v1`
+> 版本: v0.13.0 | 基础路径: `/api/v1`
 
 ## REST API
 
@@ -1439,3 +1439,39 @@ await client.register();
 await client.connect();
 await client.run();
 ```
+
+---
+
+## Phase 13: Full-auto Dev Loop + Dashboard Enhancement
+
+Phase 13 新增端点拆分为独立文档（遵守 80 行约束）：
+
+| 文档 | 端点 |
+|------|------|
+| [API-phase13-pipeline.md](API-phase13-pipeline.md) | Pipeline API (POST/GET /pipelines, cancel, retry) |
+| [API-phase13-pipeline-ws.md](API-phase13-pipeline-ws.md) | Pipeline WS 消息 + 代码审查模型 |
+| [API-phase13-metrics.md](API-phase13-metrics.md) | Metrics History API (GET /metrics/history) |
+| [API-phase13-notifications.md](API-phase13-notifications.md) | Notification API (GET /notifications, mark read) |
+| [API-phase13-health.md](API-phase13-health.md) | Health API (GET /health) |
+
+### 新增 Hook 点
+
+| HookPoint | 触发时机 | HookContext 字段 |
+|-----------|---------|-----------------|
+| `pipeline.started` | Pipeline 启动 | pipeline_id, project_id |
+| `pipeline.phase_change` | Pipeline 阶段变更 | pipeline_id, old_phase, new_phase |
+| `pipeline.completed` | Pipeline 完成 | pipeline_id, outcome |
+| `pipeline.failed` | Pipeline 失败 | pipeline_id, error |
+| `review.requested` | 代码审查请求 | pipeline_id, changed_files |
+| `review.completed` | 代码审查完成 | pipeline_id, outcome |
+| `notification.created` | 通知创建 | notification_id, type |
+
+### 新增错误码
+
+| 错误码 | 说明 |
+|--------|------|
+| `pipeline_not_found` | Pipeline 不存在 |
+| `pipeline_not_failed` | Pipeline 未处于 failed 状态，无法重试 |
+| `pipeline_already_running` | 项目已有运行中的 pipeline |
+| `invalid_metric` | 无效的指标名称 |
+| `notification_not_found` | 通知不存在 |

@@ -6,6 +6,7 @@
 <title>Agora Dashboard</title>
 <link rel="stylesheet" href="/static/css/dashboard.css">
 <link rel="stylesheet" href="/static/css/components.css">
+<link rel="stylesheet" href="/static/css/notifications.css">
 </head>
 <body>
 
@@ -28,6 +29,31 @@
   <a data-page="agents" href="#agents">Agents</a>
   <a data-page="plugins" href="#plugins">Plugins</a>
   <a data-page="audit" href="#audit">Audit</a>
+  <a data-page="metrics" href="#metrics">Metrics</a>
+  <div id="conn-status" class="conn-status offline" title="Connection status">
+    <span id="conn-dot" class="conn-dot offline"></span>
+    <span id="conn-label" class="conn-label">Offline</span>
+  </div>
+  <div id="notif-bell" class="notif-bell" title="Notifications">
+    &#128276;<span id="notif-badge" class="notif-badge" style="display:none">0</span>
+    <div id="notif-dropdown" class="notif-dropdown">
+      <div class="notif-header">
+        <span>Notifications</span>
+        <button id="notif-mark-all" class="btn-sm secondary">Mark all read</button>
+      </div>
+      <div class="notif-filters">
+        <select id="notif-filter-project"><option value="">All Projects</option></select>
+        <select id="notif-filter-priority">
+          <option value="">All Priorities</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div id="notif-list" class="notif-list"></div>
+    </div>
+  </div>
 </nav>
 
 <!-- Page: Overview -->
@@ -107,6 +133,28 @@
   <div id="audit-pager" style="margin-top:12px;display:flex;gap:8px"></div>
 </div>
 
+<!-- Page: Metrics (Phase 13.3b) -->
+<div id="metrics" class="page">
+  <h2>Metrics Dashboard</h2>
+  <div class="charts-grid">
+    <div class="card chart-card">
+      <canvas id="chart-activity" height="220"></canvas>
+    </div>
+    <div class="card chart-card">
+      <canvas id="chart-throughput" height="220"></canvas>
+    </div>
+    <div class="card chart-card">
+      <canvas id="chart-discussion" height="220"></canvas>
+    </div>
+    <div class="card chart-card">
+      <canvas id="chart-pipeline" height="220"></canvas>
+    </div>
+    <div class="card chart-card chart-card-wide">
+      <canvas id="chart-rate-limit" height="220"></canvas>
+    </div>
+  </div>
+</div>
+
 <!-- Modal -->
 <div id="modal-overlay" class="modal-overlay hidden">
   <div class="modal">
@@ -119,6 +167,8 @@
   </div>
 </div>
 
+<!-- Chart.js CDN (Phase 13.3b) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <!-- ES Module Scripts -->
 <script type="module" src="/static/js/app.js"></script>
 </body>

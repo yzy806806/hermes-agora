@@ -1,9 +1,11 @@
-/* Discussions page — real-time discussion viewer with WS subscription */
+/* Discussions page — real-time viewer with WS subscription.
+Phase 13.2b: uses DISCUSSION_UPDATE canonical type
+(backward-compat via ws-client alias from legacy types). */
 import { api } from '../api.js';
 import { ws } from '../ws-client.js';
 
 let currentMotion = null, unsubs = [];
-const ROLE_COLORS = { proposer:'#f59e0b', participant:'#3b82f6', reviewer:'#8b5cf6', moderator:'#ef4444' };
+const ROLE_COLORS = {proposer:'#f59e0b',participant:'#3b82f6',reviewer:'#8b5cf6',moderator:'#ef4444'};
 const $ = id => document.getElementById(id);
 
 export function mount(c) {
@@ -54,19 +56,19 @@ function renderEntry(x) {
 }
 
 function subscribeWS() {
-  unsubs.push(ws.on('DISCUSSION_MESSAGE', p => {
-    if (p.motion_id !== currentMotion) return;
-    const el = $('timeline'); if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
-    el.insertAdjacentHTML('beforeend', renderEntry({ time:p.timestamp, agent_id:p.agent_id, content:p.content, round_num:p.round }));
-    if (atBottom) el.scrollTop = el.scrollHeight;
-  }));
-  unsubs.push(ws.on('MOTION_STATUS', p => {
-    if (p.motion_id !== currentMotion) return;
-    const el = $('motion-status'); if (el) el.textContent = p.status;
-  }));
-  unsubs.push(ws.on('VOTE_CAST', p => {
-    if (p.motion_id !== currentMotion) return;
-    loadVotes(currentMotion);
+  // Phase 13.2b: canonical DISCUSSION_UPDATE catches all discussion events
+  unsubs.push(ws.on('DISCUSSION_UPDATE', p => {
+    if (p.motion_id && p.motion_id !== currentMotion) return;
+    if (p.content) {
+      const el = $('timeline'); if (!el) return;
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+      el.insertAdjacentHTML('beforeend',
+        renderEntry({time:p.timestamp,agent_id:p.agent_id,content:p.content,round_num:p.round}));
+      if (atBottom) el.scrollTop = el.scrollHeight;
+    }
+    if (p.status) {
+      const el = $('motion-status'); if (el) el.textContent = p.status;
+    }
+    if (p.vote) loadVotes(currentMotion);
   }));
 }

@@ -63,6 +63,11 @@ class MessageType(str, Enum):
     TASK_PROGRESS = "TASK_PROGRESS"       # agent→coordinator: progress update
     GRAPH_COMPLETE = "GRAPH_COMPLETE"     # coordinator→all: graph finished
     GRAPH_ABORTED = "GRAPH_ABORTED"       # coordinator→all: graph aborted
+    # Phase 13: pipeline messages (coordinator→dashboard)
+    PIPELINE_PHASE_CHANGE = "PIPELINE_PHASE_CHANGE"
+    PIPELINE_TASK_UPDATE = "PIPELINE_TASK_UPDATE"
+    PIPELINE_COMPLETED = "PIPELINE_COMPLETED"
+    PIPELINE_ERROR = "PIPELINE_ERROR"
 
 
 class MotionStatus(str, Enum):

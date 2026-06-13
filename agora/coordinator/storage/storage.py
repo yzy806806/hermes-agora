@@ -27,10 +27,12 @@ from . import sessions as _sessions
 from . import tasks as _tasks
 from . import votes as _votes
 from . import parallel as _parallel
+from . import pipelines as _pipelines
+from . import notifications as _notifications
 from . import rbac as _rbac
 from . import tokens as _tokens
 from . import sessions as _sessions
-from .schema import SCHEMA_SQL, SCHEMA_VERSION, MIGRATION_6_TO_7, MIGRATION_7_TO_8, MIGRATION_8_TO_9, MIGRATION_9_TO_10, MIGRATION_10_TO_11
+from .schema import SCHEMA_SQL, SCHEMA_VERSION, MIGRATION_6_TO_7, MIGRATION_7_TO_8, MIGRATION_8_TO_9, MIGRATION_9_TO_10, MIGRATION_10_TO_11, MIGRATION_11_TO_12, MIGRATION_12_TO_13, MIGRATION_12_TO_13_PIPELINES
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +97,24 @@ class Storage:
                     await db.execute(stmt)
                 logger.info(
                     "Applied migration 10→11 (Phase 12.5a session_records)")
+
+            if current_ver < 12:
+                for stmt in MIGRATION_11_TO_12:
+                    await db.execute(stmt)
+                logger.info(
+                    "Applied migration 11→12 (Phase 13 pipeline_runs)")
+
+            if current_ver < 13:
+                for stmt in MIGRATION_12_TO_13:
+                    await db.execute(stmt)
+                logger.info(
+                    "Applied migration 12→13 (Phase 13 notifications)")
+
+            if current_ver < 14:
+                for stmt in MIGRATION_12_TO_13_PIPELINES:
+                    await db.execute(stmt)
+                logger.info(
+                    "Applied migration 13→14 (Phase 13b failed_phase)")
 
             await db.execute(
                 "INSERT OR IGNORE INTO schema_version VALUES (?, ?)",
@@ -758,3 +778,126 @@ class Storage:
         async with self._connection() as db:
             return await _artifacts.list_artifacts(
                 db, project_id)
+
+    # --- PipelineRun CRUD (Phase 13) ---
+
+    async def create_pipeline_run(
+        self, project_id: str, idea: str,
+        phase: str = "discussing",
+        motion_id: str | None = None,
+        graph_id: str | None = None,
+    ) -> dict:
+        async with self._connection() as db:
+            return await _pipelines.create_pipeline_run(
+                db, project_id, idea, phase=phase,
+                motion_id=motion_id, graph_id=graph_id)
+
+    async def get_pipeline_run(self, run_id: str) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _pipelines.get_pipeline_run(db, run_id)
+
+    async def list_pipeline_runs(
+        self, project_id: str | None = None,
+        phase: str | None = None,
+        limit: int = 100, offset: int = 0,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _pipelines.list_pipeline_runs(
+                db, project_id=project_id, phase=phase,
+                limit=limit, offset=offset)
+
+    async def update_pipeline_run(
+        self, run_id: str, updates: dict,
+    ) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _pipelines.update_pipeline_run(
+                db, run_id, updates)
+
+    async def delete_pipeline_run(self, run_id: str) -> bool:
+        async with self._connection() as db:
+            return await _pipelines.delete_pipeline_run(db, run_id)
+
+    async def count_pipeline_runs(
+        self, project_id: str | None = None,
+        phase: str | None = None,
+    ) -> int:
+        """Count total pipeline runs matching filters."""
+        async with self._connection() as db:
+            return await _pipelines.count_pipeline_runs(
+                db, project_id=project_id, phase=phase)
+
+    # --- Notification CRUD (Phase 13) ---
+
+    async def create_notification(
+        self, type: str, title: str, body: str,
+        project_id: str, priority: str = "medium",
+    ) -> dict:
+        async with self._connection() as db:
+            return await _notifications.create_notification(
+                db, type, title, body,
+                project_id=project_id, priority=priority)
+
+    async def get_notification(self, notif_id: str) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _notifications.get_notification(db, notif_id)
+
+    async def list_notifications(
+        self, project_id: str | None = None,
+        unread_only: bool = False,
+        priority: str | None = None,
+        limit: int = 50, offset: int = 0,
+    ) -> list[dict]:
+        async with self._connection() as db:
+            return await _notifications.list_notifications(
+                db, project_id=project_id,
+                unread_only=unread_only,
+                priority=priority,
+                limit=limit, offset=offset)
+
+    async def count_notifications(
+        self, project_id: str | None = None,
+        unread_only: bool = False,
+        priority: str | None = None,
+    ) -> tuple[int, int]:
+        """Return (total, unread_count) for the given filters."""
+        async with self._connection() as db:
+            return await _notifications.count_notifications(
+                db, project_id=project_id,
+                unread_only=unread_only,
+                priority=priority)
+
+    async def mark_notification_read(
+        self, notif_id: str,
+    ) -> Optional[dict]:
+        async with self._connection() as db:
+            return await _notifications.mark_read(db, notif_id)
+
+    async def mark_all_notifications_read(
+        self, project_id: str | None = None,
+    ) -> int:
+        async with self._connection() as db:
+            return await _notifications.mark_all_read(
+                db, project_id=project_id)
+
+    # --- Metrics History (Phase 13.3a) ---
+
+    async def query_metrics_history(
+        self, func_name: str, range_key: str,
+        project_id: str | None = None,
+    ) -> dict:
+        """Dispatch to the right metrics history query function."""
+        from . import metrics_history as _mh
+        from . import metrics_history_extra as _mhe
+        from . import metrics_history_pipeline as _mhp
+        func_map = {
+            "query_agent_activity": _mh.query_agent_activity,
+            "query_task_throughput": _mh.query_task_throughput,
+            "query_discussion_outcomes": _mhe.query_discussion_outcomes,
+            "query_pipeline_success_rate": _mhp.query_pipeline_success_rate,
+            "query_rate_limit_usage": _mhp.query_rate_limit_usage,
+        }
+        func = func_map.get(func_name)
+        if func is None:
+            return {"labels": [], "datasets": []}
+        async with self._connection() as db:
+            return await func(db, range_key, project_id=project_id)

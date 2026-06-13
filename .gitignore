@@ -4,3 +4,8 @@ __pycache__/
 .pytest_cache/
 data/
 *.egg-info/
+# Rust
+packages/agora-agent-sdk-rust/target/
+# Go binaries
+packages/agora-agent-sdk-go/minimal
+packages/agora-agent-sdk-go/minimal.exe
